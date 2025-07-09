@@ -1,7 +1,7 @@
 from utils import greet
 
 def main():
-    print(greet("GitHub Desktop ÓÃ»§"))
+    print(greet("GitHub Desktop ï¿½Ã»ï¿½"))
 
 if __name__ == "__main__":
     main()
