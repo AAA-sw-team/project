@@ -1,0 +1,18 @@
+### 登录获取 token
+POST http://localhost:3001/api/auth/login
+Content-Type: application/json
+{
+  "username": "test01",
+  "password": "123456"
+}
+
+### 创建讲座
+POST http://localhost:3001/api/lectures
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Miwicm9sZSI6InNwZWFrZXIiLCJpYXQiOjE3NTI0OTk1NjIsImV4cCI6MTc1MjU0Mjc2Mn0.tPlUqYwMhVmu3t9kTZ05c5mIQ1gQex2E8hXBOmxYZuQ
+
+{
+  "title": "AI时代的未来",
+  "description": "关于人工智能的发展趋势和应用"
+}
+
