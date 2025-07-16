@@ -1,4 +1,4 @@
-### 登录获取 token
+### speaker登录获取 token
 POST http://localhost:3001/api/auth/login
 Content-Type: application/json
 
@@ -6,7 +6,14 @@ Content-Type: application/json
   "username": "test01",
   "password": "123456"
 }
+### listener登录获取 token
+POST http://localhost:3001/api/auth/login
+Content-Type: application/json
 
+{
+  "username": "test02",
+  "password": "123456"
+}
 ### 创建讲座
 POST http://localhost:3001/api/lectures
 Content-Type: application/json
@@ -16,4 +23,25 @@ Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Miwicm9sZSI6InNwZWFr
   "title": "AI时代的未来",
   "description": "关于人工智能的发展趋势和应用"
 }
+
+### 生成问题
+POST http://localhost:3001/api/quizzes/generate/1
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsInJvbGUiOiJzcGVha2VyIiwiaWF0IjoxNzUyNjU5NTg3LCJleHAiOjE3NTI2NzAzODd9.ci3dqApEUTaCQ9Gla5TH3Bj2BAbWvDnmeIQVTdimhGQ
+
+file=@./text.txt;type=text/plain
+
+### 获取问题列表
+GET http://localhost:3001/api/quizzes/lecture/1
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsInJvbGUiOiJzcGVha2VyIiwiaWF0IjoxNzUyNjU5NTg3LCJleHAiOjE3NTI2NzAzODd9.ci3dqApEUTaCQ9Gla5TH3Bj2BAbWvDnmeIQVTdimhGQ
+
+### 提交答题结果
+POST http://localhost:3001/api/quizzes/answer
+Content-Type: application/json
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInJvbGUiOiJsaXN0ZW5lciIsImlhdCI6MTc1MjY2MTk3NCwiZXhwIjoxNzUyNjcyNzc0fQ.jji8jTR9RjT0zHQgQIiwUChtTA5tCD7MxBA_8DN-qUg
+
+{
+  "quizId": 1,
+  "selectedOption": "C"
+}
+
 
