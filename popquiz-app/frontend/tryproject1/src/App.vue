@@ -3,14 +3,20 @@
     <header>
       <h1>PQ智能系统</h1>
     </header>
-    <main>
+    <component :is="isLectureLayout ? 'div' : 'main'">
       <router-view />
-    </main>
+    </component>
     <footer>
       <small>© 2024 PQ PopQuiz Web</small>
     </footer>
   </div>
 </template>
+
+<script setup>
+import { useRoute } from 'vue-router'
+const route = useRoute()
+const isLectureLayout = route.path.startsWith('/lecture/')
+</script>
 
 <style>
 #app {
@@ -23,14 +29,20 @@
 header {
   background: #3eaf7c;
   color: #fff;
-  padding: 1rem;
+  padding: 1rem 0;
   text-align: center;
+  width: 100vw;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 100;
 }
 main {
   flex: 1;
   padding: 2rem;
   max-width: 600px;
   margin: 0 auto;
+  margin-top: 64px; /* header高度 */
 }
 footer {
   background: #222;
