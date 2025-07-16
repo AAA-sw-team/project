@@ -33,7 +33,7 @@ const handleLogin = async () => {
   const res = await axios.post('/api/auth/login', { username: username.value, password: password.value, role: role.value })
   if (res.data.success) {
     if (role.value === 'listener') router.push('/listener')
-    else if (role.value === 'speaker') router.push('/speaker')
+    else if (role.value === 'speaker') router.push('/speaker/index')
     else if (role.value === 'organizer') router.push('/organizer')
   } else {
     alert('登录失败')

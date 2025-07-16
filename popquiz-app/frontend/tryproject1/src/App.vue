@@ -29,8 +29,6 @@ header {
 main {
   flex: 1;
   padding: 2rem;
-  max-width: 600px;
-  margin: 0 auto;
 }
 footer {
   background: #222;
