@@ -31,7 +31,7 @@ header {
   color: #fff;
   padding: 1rem 0;
   text-align: center;
-  width: 100vw;
+  width: 100%;
   position: fixed;
   left: 0;
   top: 0;
@@ -49,5 +49,13 @@ footer {
   color: #fff;
   text-align: center;
   padding: 0.5rem;
+  width: 100%;
+  left: 0;
+  bottom: 0;
+}
+footer small {
+  display: block;
+  text-align: center;
+  width: 100%;
 }
 </style>
