@@ -30,11 +30,19 @@ const role = ref('')
 const router = useRouter()
 
 const handleRegister = async () => {
-  const res = await axios.post('/api/auth/register', { username: username.value, password: password.value, role: role.value })
-  if (res.data.success) {
-    router.push('/login')
-  } else {
-    alert('注册失败')
+  try {
+    const res = await axios.post('/api/auth/register', {
+      username: username.value,
+      password: password.value,
+      role: role.value
+    })
+    if (res.data.message === '注册成功！') {
+      router.push('/login')
+    } else {
+      alert(res.data.error || '注册失败')
+    }
+  } catch (err) {
+    alert('注册失败，请检查输入或用户名是否已存在')
   }
 }
 </script>

@@ -30,13 +30,21 @@ const role = ref('')
 const router = useRouter()
 
 const handleLogin = async () => {
-  const res = await axios.post('/api/auth/login', { username: username.value, password: password.value, role: role.value })
-  if (res.data.success) {
-    if (role.value === 'listener') router.push('/listener')
-    else if (role.value === 'speaker') router.push('/speaker')
-    else if (role.value === 'organizer') router.push('/organizer')
-  } else {
-    alert('登录失败')
+  try {
+    const res = await axios.post('/api/auth/login', { 
+      username: username.value, 
+      password: password.value, 
+      role: role.value 
+    })
+    if (res.data.message === '登录成功') {
+      if (role.value === 'listener') router.push('/listener')
+      else if (role.value === 'speaker') router.push('/speaker/index')
+      else if (role.value === 'organizer') router.push('/organizer')
+    } else {
+      alert(res.data.error || '登录失败')
+    }
+  } catch (err) {
+    alert('请求失败，请检查网络或后端服务')
   }
 }
 </script>

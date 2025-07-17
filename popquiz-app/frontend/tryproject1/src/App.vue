@@ -40,9 +40,12 @@ header {
 main {
   flex: 1;
   padding: 2rem;
+<<<<<<< HEAD
   max-width: 600px;
   margin: 0 auto;
   margin-top: 64px; /* header高度 */
+=======
+>>>>>>> 108a7d1f56a9af23c2a6934a032af55b417a9065
 }
 footer {
   background: #222;

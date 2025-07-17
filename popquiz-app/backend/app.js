@@ -14,6 +14,7 @@ app.use('/api/auth', authRoutes);
 const lectureRoutes = require('./routers/lectureRoutes');
 app.use('/api/lectures', lectureRoutes);
 
+app.use('/api/quizzes', require('./routers/quizRoutes'));
 
 app.get('/', (req, res) => {
   res.send('✅✅✅PopQuiz 后端启动成功！');

@@ -24,6 +24,10 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+<<<<<<< HEAD
+=======
+import QuizCard from '../../components/QuizCard.vue'
+>>>>>>> 108a7d1f56a9af23c2a6934a032af55b417a9065
 import axios from 'axios'
 
 interface Quiz {
