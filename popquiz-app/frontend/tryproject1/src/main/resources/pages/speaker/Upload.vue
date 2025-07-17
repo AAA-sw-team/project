@@ -58,7 +58,7 @@ const publishQuiz = async () => {
 </script>
 
 <style scoped>
-.upload-wrapper {
+/* .upload-wrapper {
   width: 100%;
   padding: 1.2rem 3rem 2rem 3rem;
   margin: 1.2rem 0 2.5rem 0;
@@ -66,7 +66,7 @@ const publishQuiz = async () => {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-}
+} */
 
 .upload-title {
   font-size: 2rem;
