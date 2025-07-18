@@ -13,6 +13,11 @@ import ScorePage from './main/resources/pages/listener/ScorePage.vue'
 import DiscussionPage from './main/resources/pages/listener/DiscussionPage.vue'
 import FeedbackPage from './main/resources/pages/listener/FeedbackPage.vue'
 import SpeakerIndex from './main/resources/pages/speaker/index.vue'
+import OrganizerHome from './main/resources/pages/organizer/OrganizerHome.vue'
+import OrganizerLectureLayout from './main/resources/pages/organizer/LectureLayout.vue'
+import OrganizerScorePage from './main/resources/pages/organizer/ScorePage.vue'
+import OrganizerDiscussionPage from './main/resources/pages/organizer/DiscussionPage.vue'
+import OrganizerFeedbackPage from './main/resources/pages/organizer/FeedbackPage.vue'
 
 // 路由配置
 const routes = [
@@ -37,7 +42,20 @@ const routes = [
   { path: '/speaker', redirect: '/speaker/index' },
   { path: '/speaker/index', component: SpeakerIndex },
 
-]
+  // organizer 路由
+  { path: '/organizer', redirect: '/organizer/home' },
+  { path: '/organizer/home', component: OrganizerHome },
+  {
+    path: '/organizer/lectures/:id',
+    component: OrganizerLectureLayout,
+    children: [
+      { path: '', redirect: 'score' },
+      { path: 'score', name: 'OrganizerScorePage', component: OrganizerScorePage },
+      { path: 'discussion', component: OrganizerDiscussionPage },
+      { path: 'feedback', component: OrganizerFeedbackPage }
+    ]
+  }
+];
 
 const router = createRouter({
   history: createWebHistory(),
