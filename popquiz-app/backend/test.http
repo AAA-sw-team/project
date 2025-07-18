@@ -45,3 +45,10 @@ Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInJvbGUiOiJs
 }
 
 
+### 上传讲座文件（文本或 PPT/PDF）
+POST http://localhost:3001/api/quizzes/upload/1
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsInJvbGUiOiJzcGVha2VyIiwiaWF0IjoxNzUyODQ0NTIxLCJleHAiOjE3NTI4NTUzMjF9.XOoSqrVT6dBeTE6rSFcHcaoXDRyTPxMCTQZpRwagEL0
+
+file=@./uploads/text.txt;type=text/plain
+
+
