@@ -14,7 +14,14 @@ app.use('/api/auth', authRoutes);
 const lectureRoutes = require('./routers/lectureRoutes');
 app.use('/api/lectures', lectureRoutes);
 
-app.use('/api/quizzes', require('./routers/quizRoutes'));
+const quizRoutes = require('./routers/quizRoutes');
+app.use('/api/quizzes',quizRoutes );
+
+const answerRoutes = require('./routers/answerRoutes');
+app.use('/api/answers', answerRoutes);
+
+const statisticsRoutes = require('./routers/statisticsRoutes');
+app.use('/api/statistics', statisticsRoutes);
 
 app.get('/', (req, res) => {
   res.send('✅✅✅PopQuiz 后端启动成功！');
