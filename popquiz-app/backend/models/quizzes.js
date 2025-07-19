@@ -1,4 +1,4 @@
-const pool = require('../db');
+const pool = require('./db');
 
 // 插入 quiz
 const createQuiz = (lectureId, question, options, correctOption) => {

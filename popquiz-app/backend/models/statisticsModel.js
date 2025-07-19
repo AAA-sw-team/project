@@ -1,4 +1,4 @@
-const pool = require('../db');
+const pool = require('./db');
 
 // 获取某讲座所有题目总答题数和正确数
 const getLectureOverallStats = async (lectureId) => {

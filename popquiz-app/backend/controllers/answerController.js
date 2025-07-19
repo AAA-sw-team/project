@@ -1,5 +1,5 @@
 const answerModel = require('../models/answerModel');
-const quizModel = require('../models/quizModel');
+const quizModel = require('../models/quizzes');
 
 // 听众提交答题
 const submitAnswer = async (req, res) => {
