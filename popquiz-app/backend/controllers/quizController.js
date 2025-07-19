@@ -1,4 +1,4 @@
-const quizModel = require('../models/quizModel');
+const quizModel = require('../models/quizzes');
 const fs = require('fs');
 const path = require('path');
 const pdfParse = require('pdf-parse');  // 用于PDF文本解析

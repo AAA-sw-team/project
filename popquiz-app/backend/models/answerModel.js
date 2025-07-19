@@ -1,4 +1,4 @@
-const pool = require('../db');
+const pool = require('./db');
 
 const saveAnswer = (quizId, userId, selectedOption, isCorrect) => {
   return pool.promise().query(

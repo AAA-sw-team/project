@@ -17,10 +17,10 @@ app.use('/api/lectures', lectureRoutes);
 const quizRoutes = require('./routers/quizRoutes');
 app.use('/api/quizzes',quizRoutes );
 
-const answerRoutes = require('./routes/answerRoutes');
+const answerRoutes = require('./routers/answerRoutes');
 app.use('/api/answers', answerRoutes);
 
-const statisticsRoutes = require('./routes/statisticsRoutes');
+const statisticsRoutes = require('./routers/statisticsRoutes');
 app.use('/api/statistics', statisticsRoutes);
 
 app.get('/', (req, res) => {
