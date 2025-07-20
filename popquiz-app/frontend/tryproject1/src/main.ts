@@ -18,6 +18,12 @@ import OrganizerLectureLayout from './main/resources/pages/organizer/LectureLayo
 import OrganizerScorePage from './main/resources/pages/organizer/ScorePage.vue'
 import OrganizerDiscussionPage from './main/resources/pages/organizer/DiscussionPage.vue'
 import OrganizerFeedbackPage from './main/resources/pages/organizer/FeedbackPage.vue'
+import SpeakerHome from './main/resources/pages/speaker/SpeakerHome.vue'
+import SpeakerLectureLayout from './main/resources/pages/speaker/LectureLayout.vue'
+import SpeakerUpload from './main/resources/pages/speaker/Upload.vue'
+import SpeakerStats from './main/resources/pages/speaker/Stats.vue'
+import SpeakerDiscussion from './main/resources/pages/speaker/Discussion.vue'
+import SpeakerFeedback from './main/resources/pages/speaker/Feedback.vue'
 
 // 路由配置
 const routes = [
@@ -38,9 +44,21 @@ const routes = [
     ]
   },
   { path: '/speaker', component: SpeakerIndex },
-
   { path: '/speaker', redirect: '/speaker/index' },
   { path: '/speaker/index', component: SpeakerIndex },
+  { path: '/speaker', redirect: '/speaker/home' },
+  { path: '/speaker/home', component: SpeakerHome },
+  {
+    path: '/speaker/lecture/:id',
+    component: SpeakerLectureLayout,
+    children: [
+      { path: '', redirect: 'upload' },
+      { path: 'upload', component: SpeakerUpload },
+      { path: 'stats', component: SpeakerStats },
+      { path: 'discussion', component: SpeakerDiscussion },
+      { path: 'feedback', component: SpeakerFeedback }
+    ]
+  },
 
   // organizer 路由
   { path: '/organizer', redirect: '/organizer/home' },

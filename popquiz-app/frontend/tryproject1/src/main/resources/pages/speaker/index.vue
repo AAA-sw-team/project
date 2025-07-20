@@ -1,43 +1,10 @@
-<template>
-  <div class="speaker-layout">
-    <aside class="sidebar">
-      <div class="welcome-area">
-        <div class="welcome">欢迎，演讲者</div>
-      </div>
-      <ul>
-        <li :class="{active: tab==='upload'}" @click="tab='upload'">
-          <span class="icon">📤</span> 上传文件
-        </li>
-        <li :class="{active: tab==='stats'}" @click="tab='stats'">
-          <span class="icon">📊</span> 答题情况
-        </li>
-        <li :class="{active: tab==='discussion'}" @click="tab='discussion'">
-          <span class="icon">💬</span> 讨论
-        </li>
-        <li :class="{active: tab==='feedback'}" @click="tab='feedback'">
-          <span class="icon">📝</span> 反馈
-        </li>
-      </ul>
-    </aside>
-    <main class="main-content">
-      <div class="main-card">
-        <SpeakerUpload v-if="tab==='upload'" />
-        <SpeakerStats v-if="tab==='stats'" />
-        <SpeakerDiscussion v-if="tab==='discussion'" />
-        <SpeakerFeedback v-if="tab==='feedback'" />
-      </div>
-    </main>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref } from 'vue'
-import SpeakerUpload from './Upload.vue'
-import SpeakerStats from './Stats.vue'
-import SpeakerDiscussion from './Discussion.vue'
-import SpeakerFeedback from './Feedback.vue'
-
-const tab = ref('upload')
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+const router = useRouter()
+onMounted(() => {
+  router.replace('/speaker/home')
+})
 </script>
 
 <style scoped>
