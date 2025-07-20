@@ -11,11 +11,34 @@
  Target Server Version : 80038 (8.0.38)
  File Encoding         : 65001
 
- Date: 16/07/2025 21:04:03
+ Date: 20/07/2025 17:43:03
 */
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for files
+-- ----------------------------
+DROP TABLE IF EXISTS `files`;
+CREATE TABLE `files`  (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `lecture_id` int NOT NULL,
+  `speaker_id` int NOT NULL,
+  `filename` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `filepath` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `filetype` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `uploaded_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `lecture_id`(`lecture_id` ASC) USING BTREE,
+  INDEX `idx_speaker_id`(`speaker_id` ASC) USING BTREE,
+  CONSTRAINT `files_ibfk_1` FOREIGN KEY (`lecture_id`) REFERENCES `lectures` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT `files_ibfk_2` FOREIGN KEY (`speaker_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of files
+-- ----------------------------
 
 -- ----------------------------
 -- Table structure for lectures
@@ -27,6 +50,7 @@ CREATE TABLE `lectures`  (
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
   `speaker_id` int NOT NULL,
   `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  `file_path` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `speaker_id`(`speaker_id` ASC) USING BTREE,
   CONSTRAINT `lectures_ibfk_1` FOREIGN KEY (`speaker_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
@@ -35,7 +59,7 @@ CREATE TABLE `lectures`  (
 -- ----------------------------
 -- Records of lectures
 -- ----------------------------
-INSERT INTO `lectures` VALUES (1, 'AI时代的未来', '关于人工智能的发展趋势和应用', 2, '2025-07-15 18:05:08');
+INSERT INTO `lectures` VALUES (1, 'AI时代的未来', '关于人工智能的发展趋势和应用', 2, '2025-07-15 18:05:08', NULL);
 
 -- ----------------------------
 -- Table structure for quiz_answers
@@ -77,7 +101,7 @@ CREATE TABLE `quizzes`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `lecture_id`(`lecture_id` ASC) USING BTREE,
   CONSTRAINT `quizzes_ibfk_1` FOREIGN KEY (`lecture_id`) REFERENCES `lectures` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 12 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of quizzes
@@ -86,6 +110,13 @@ INSERT INTO `quizzes` VALUES (1, 1, '人工智能的核心是什么？', '数据
 INSERT INTO `quizzes` VALUES (2, 1, '以下哪个不是人工智能的应用？', '语音识别', '自动驾驶', '翻译系统', '电饭煲加热', 'D', '2025-07-15 20:01:54');
 INSERT INTO `quizzes` VALUES (3, 1, '人工智能的核心是什么？', '数据分析', '人脸识别', '模仿人类思维', '控制硬件', 'C', '2025-07-16 17:55:11');
 INSERT INTO `quizzes` VALUES (4, 1, '以下哪个不是人工智能的应用？', '语音识别', '自动驾驶', '翻译系统', '电饭煲加热', 'D', '2025-07-16 17:55:11');
+INSERT INTO `quizzes` VALUES (5, 1, 'AI 是什么的缩写？', 'Artificial Intelligence', 'Animal Intelligence', 'Auto Interface', 'Advanced Input', 'A', '2025-07-19 17:02:38');
+INSERT INTO `quizzes` VALUES (6, 1, 'AI 是什么的缩写？', 'Artificial Intelligence', 'Animal Intelligence', 'Auto Interface', 'Advanced Input', 'A', '2025-07-19 21:28:52');
+INSERT INTO `quizzes` VALUES (7, 1, '机器学习属于哪种技术？', '硬件技术', '软件技术', '人工智能', '网络技术', 'C', '2025-07-19 21:28:52');
+INSERT INTO `quizzes` VALUES (8, 1, 'AI 是什么的缩写？', 'Artificial Intelligence', 'Animal Intelligence', 'Auto Interface', 'Advanced Input', 'A', '2025-07-19 21:38:25');
+INSERT INTO `quizzes` VALUES (9, 1, '机器学习属于哪种技术？', '硬件技术', '软件技术', '人工智能', '网络技术', 'C', '2025-07-19 21:38:25');
+INSERT INTO `quizzes` VALUES (10, 1, 'AI 是什么的缩写？', 'Artificial Intelligence', 'Animal Intelligence', 'Auto Interface', 'Advanced Input', 'A', '2025-07-19 21:40:02');
+INSERT INTO `quizzes` VALUES (11, 1, '机器学习属于哪种技术？', '硬件技术', '软件技术', '人工智能', '网络技术', 'C', '2025-07-19 21:40:02');
 
 -- ----------------------------
 -- Table structure for users

@@ -1,100 +1,46 @@
 const quizModel = require('../models/quizzes');
 const fs = require('fs');
 const path = require('path');
-const pdfParse = require('pdf-parse');  // 用于PDF文本解析
+const { generateQuizFromText } = require('../utils/deepseek');
+const Quiz = require('../models/quizzes');
+const pool = require('../models/db');
+const fileModel = require('../models/fileModel');
+const fileReader = require('../utils/fileReader');
 
-
-// 模拟 AI 生成选择题
-const generateQuizFromText = async (lectureId, text) => {
-  // 这里简单模拟，真实可以调用外部AI接口
-  const fakeQuizzes = [
-    {
-      question: 'AI 是什么的缩写？',
-      options: ['Artificial Intelligence', 'Animal Intelligence', 'Auto Interface', 'Advanced Input'],
-      correctOption: 'A',
-    },
-    {
-      question: '机器学习属于哪种技术？',
-      options: ['硬件技术', '软件技术', '人工智能', '网络技术'],
-      correctOption: 'C',
-    }
-  ];
-
-  for (const quiz of fakeQuizzes) {
-    await quizModel.createQuiz(
-      lectureId,
-      quiz.question,
-      quiz.options,
-      quiz.correctOption
-    );
-  }
-
-  return fakeQuizzes;
-};
-
-//上传文件
-const handleUpload = async (req, res) => {
-  const lectureId = req.params.lectureId;
-  const file = req.file;
-
-  if (!file) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-
-  const ext = path.extname(file.originalname).toLowerCase();
-
-  try {
-    let textContent = '';
-
-    if (ext === '.txt') {
-      textContent = fs.readFileSync(file.path, 'utf8');
-    } else if (ext === '.pdf') {
-      const dataBuffer = fs.readFileSync(file.path);
-      const data = await pdfParse(dataBuffer);
-      textContent = data.text;
-    } else {
-      return res.status(400).json({ error: 'Unsupported file type' });
-    }
-
-    // 调用生成题目函数
-    const quizzes = await generateQuizFromText(lectureId, textContent);
-
-    res.json({
-      message: 'File uploaded, text extracted, quizzes generated',
-      lectureId,
-      filePath: file.path,
-      quizzes,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to process file and generate quizzes' });
-  }
-};
-
-// 创建 quiz（暂用模拟数据）
+// 根据前端选择的文件生成题目
 const generateQuiz = async (req, res) => {
-  const lectureId = req.params.lectureId;
-
-  // TODO: 后期用 AI 生成
-  const sampleQuiz = {
-    question: 'AI 是什么的缩写？',
-    options: ['Artificial Intelligence', 'Animal Intelligence', 'Auto Interface', 'Advanced Input'],
-    correctOption: 'A'
-  };
-
+  const { fileId } = req.body;
   try {
-    await quizModel.createQuiz(
-      lectureId,
-      sampleQuiz.question,
-      sampleQuiz.options,
-      sampleQuiz.correctOption
-    );
-    res.json({ message: 'Quiz created successfully' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to create quiz' });
+    // 查找文件路径及 lecture_id
+    const [files] = await pool.promise().query('SELECT * FROM files WHERE id = ?', [fileId]);
+    if (!files.length) {
+      return res.status(404).json({ error: '未找到对应文件' });
+    }
+    const file = files[0];
+    const lectureId = file.lecture_id;
+    // 解析文件内容
+    const text = await fileReader.extractTextFromFile(file.filepath);
+    if (!text) {
+      return res.status(400).json({ error: '文件内容为空或解析失败' });
+    }
+    // 生成题目
+    const quizzes = await generateQuizFromText(text);
+    for (const q of quizzes) {
+      // 只取首字母大写，防止 correct_option 超长
+      const correctOption = (q.correct_option || '').trim().charAt(0).toUpperCase();
+      await quizModel.createQuiz(
+        lectureId,
+        q.question,
+        [q.option_a, q.option_b, q.option_c, q.option_d],
+        correctOption
+      );
+    }
+    res.status(200).json({ message: 'Quiz 生成成功', data: quizzes });
+  } catch (error) {
+    res.status(500).json({ error: 'Quiz 生成失败', detail: error.message });
   }
 };
+
 //获取某讲座的所有quiz
 const getQuizzes = async (req, res) => {
   const lectureId = req.params.lectureId;
@@ -111,5 +57,4 @@ const getQuizzes = async (req, res) => {
 module.exports = {
   generateQuiz,
   getQuizzes,
-  handleUpload
 };

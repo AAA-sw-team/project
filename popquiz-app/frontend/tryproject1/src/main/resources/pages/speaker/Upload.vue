@@ -23,8 +23,10 @@
 </template>
 
 <script setup lang="ts">
+
 import { ref } from 'vue'
 import axios from 'axios'
+import { useRoute } from 'vue-router'
 
 interface Quiz {
   id: string | number
@@ -34,25 +36,60 @@ interface Quiz {
 
 const fileId = ref('')
 const quizzes = ref<Quiz[]>([])
+const route = useRoute()
+const lectureId = route.params.lectureId as string
+
+
+// 获取本地token，支持Bearer
+function getAuthHeader() {
+  const token = localStorage.getItem('token') || ''
+  if (!token) return {}
+  return {
+    Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`
+  }
+}
 
 const handleFile = async (e: any) => {
   const file = e.target.files[0]
   if (!file) return
   const formData = new FormData()
   formData.append('file', file)
-  const res = await axios.post('/api/upload', formData)
-  fileId.value = res.data.fileId
+  // 调试日志
+  console.log('lectureId:', lectureId)
+  console.log('token:', localStorage.getItem('token'))
+  console.log('upload url:', `/api/quizzes/upload/${lectureId}`)
+  try {
+    const res = await axios.post(`/api/quizzes/upload/${lectureId}`, formData, {
+      headers: {
+        ...getAuthHeader(),
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    console.log('upload response:', res)
+    fileId.value = res.data.fileId
+  } catch (err) {
+    console.error('upload error:', err)
+    if (err.response) {
+      console.error('error response:', err.response)
+    }
+    alert('上传失败，请检查 lectureId、token、接口路径和后端日志！')
+  }
 }
 
 const generateQuiz = async () => {
   if (!fileId.value) return
-  const res = await axios.post('/api/quiz/generate', { fileId: fileId.value })
+  // 路径与后端保持一致
+  const res = await axios.post(`/api/quizzes/generate/${lectureId}`, { fileId: fileId.value }, {
+    headers: getAuthHeader()
+  })
   quizzes.value = res.data.quizzes
 }
 
 const publishQuiz = async () => {
   if (!quizzes.value.length) return
-  await axios.post('/api/quiz/publish', { quizzes: quizzes.value })
+  await axios.post(`/api/quizzes/publish/${lectureId}`, { quizzes: quizzes.value }, {
+    headers: getAuthHeader()
+  })
   alert('题目已发布！')
 }
 </script>
