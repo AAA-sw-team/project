@@ -1,6 +1,7 @@
+//进行文件解析模块
 const fs = require('fs');
 const pdf = require('pdf-parse');
-const pptxParser = require('pptx-parser'); // 使用 pptx-parser 解析 pptx 文件
+const pptx2json = require('pptx2json'); // 使用 pptx2json 解析 pptx 文件
 const mammoth = require('mammoth'); // docx 支持
 
 async function extractTextFromFile(filePath) {
@@ -11,13 +12,11 @@ async function extractTextFromFile(filePath) {
     const data = await pdf(dataBuffer);
     return data.text;
   } else if (ext === 'pptx') {
-    return new Promise((resolve, reject) => {
-      pptxParser(filePath, (err, result) => {
-        if (err) reject(err);
-        const text = result.map(slide => slide.text).join('\n');
-        resolve(text);
-      });
-    });
+    // pptx2json 返回 Promise，解析后 result.slides 是数组
+    const result = await pptx2json.parse(filePath);
+    // result.slides 每个 slide.texts 是数组，需合并
+    const text = result.slides.map(slide => (slide.texts || []).join(' ')).join('\n');
+    return text;
   } else if (ext === 'txt') {
     return fs.readFileSync(filePath, 'utf8');
   } else if (ext === 'docx') {
