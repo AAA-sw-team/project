@@ -31,6 +31,7 @@ function isActive(tab: string) {
   margin: 0;
   max-width: 100vw;
   width: 100vw;
+  margin-top: 80px;
 }
 .sidebar {
   width: 200px;

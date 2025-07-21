@@ -1,24 +1,26 @@
 <template>
-  <div class="speaker-home-bg">
-    <div class="speaker-home">
-      <h2 class="speaker-title">讲座管理</h2>
-      <button class="create-btn" @click="showCreate = true">+ 创建新讲座</button>
-      <div class="lecture-list">
-        <div v-for="lecture in lectures" :key="lecture.id" class="lecture-card">
-          <router-link :to="`/speaker/lecture/${lecture.id}/upload`">
-            <div class="lecture-title">{{ lecture.title }}</div>
-          </router-link>
+  <div class="center-container">
+    <div class="speaker-home-bg">
+      <div class="speaker-home">
+        <h2 class="speaker-title">讲座管理</h2>
+        <button class="create-btn" @click="showCreate = true">+ 创建新讲座</button>
+        <div class="lecture-list">
+          <div v-for="lecture in lectures" :key="lecture.id" class="lecture-card">
+            <router-link :to="`/speaker/lecture/${lecture.id}/upload`">
+              <div class="lecture-title">{{ lecture.title }}</div>
+            </router-link>
+          </div>
         </div>
-      </div>
-      <div v-if="showCreate" class="modal-bg">
-        <div class="modal">
-          <h3>新建讲座</h3>
-          <input v-model="newLecture.title" placeholder="讲座标题" />
-          <input v-model="newLecture.desc" placeholder="讲座简介" />
-          <input v-model="newLecture.speaker" placeholder="主讲人" />
-          <div class="modal-actions">
-            <button @click="createLecture">创建</button>
-            <button @click="showCreate = false">取消</button>
+        <div v-if="showCreate" class="modal-bg">
+          <div class="modal">
+            <h3>新建讲座</h3>
+            <input v-model="newLecture.title" placeholder="讲座标题" />
+            <input v-model="newLecture.desc" placeholder="讲座简介" />
+            <input v-model="newLecture.speaker" placeholder="主讲人" />
+            <div class="modal-actions">
+              <button @click="createLecture">创建</button>
+              <button @click="showCreate = false">取消</button>
+            </div>
           </div>
         </div>
       </div>
@@ -50,6 +52,19 @@ function createLecture() {
 }
 </script>
 <style scoped>
+.center-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start; /* 顶部对齐 */
+  align-items: center;
+  min-height: 80vh;
+  /* padding-top: 40px;  // 去掉或设为0 */
+}
+.center-container > * {
+  width: 80%;
+  max-width: 600px;
+  font-size: 1.2rem;
+}
 .speaker-home-bg {
   min-height: 100vh;
   width: 100vw;
@@ -58,6 +73,7 @@ function createLecture() {
   justify-content: center;
   background: linear-gradient(135deg, #e0f7fa 0%, #f6fcfa 100%);
   overflow-x: hidden;
+  margin-top: 20px; /* 或者 4rem */
 }
 .speaker-home {
   display: flex;
@@ -66,8 +82,8 @@ function createLecture() {
   border: 4px solid #a8e6cf;
   border-radius: 32px;
   background: rgba(255,255,255,0.95);
-  margin: 48px auto;
-  padding: 48px 0 48px 0;
+  margin: 0 auto; /* 移除 margin-top */
+  padding: 0 0 48px 0; /* 移除 padding-top */
   width: 90vw;
   max-width: 500px;
   min-width: 260px;
