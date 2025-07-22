@@ -16,7 +16,7 @@ const handleUpload = async (req, res) => {
   }
 
   const filename = file.originalname;
-  const filepath = file.path; 
+  const filepath = file.path;
   const filetype = file.mimetype;
 
   try {
@@ -29,6 +29,7 @@ const handleUpload = async (req, res) => {
 
     res.status(200).json({
       message: '文件上传成功',
+      fileId: result.insertId, // 新增，兼容前端
       file: {
         id: result.insertId,
         lecture_id: lectureId,
