@@ -15,7 +15,7 @@
 <script setup>
 import { useRoute } from 'vue-router'
 const route = useRoute()
-const isLectureLayout = route.path.startsWith('/lecture/')
+const isLectureLayout = route.path.startsWith('/speaker/lecture/') || route.path.startsWith('/listener/lecture/')
 </script>
 
 <style>
