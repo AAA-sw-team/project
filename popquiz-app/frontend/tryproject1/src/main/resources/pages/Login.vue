@@ -37,6 +37,7 @@ const handleLogin = async () => {
       role: role.value 
     })
     if (res.data.message === '登录成功') {
+      localStorage.setItem('token', res.data.token)   // ★★★ 关键：存储 token
       if (role.value === 'listener') router.push('/listener')
       else if (role.value === 'speaker') router.push('/speaker/index')
       else if (role.value === 'organizer') router.push('/organizer')
