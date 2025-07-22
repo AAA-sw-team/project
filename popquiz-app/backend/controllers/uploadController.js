@@ -16,7 +16,7 @@ const handleUpload = async (req, res) => {
   }
 
   const filename = file.originalname;
-  const filepath = file.path; 
+  const filepath = file.path;
   const filetype = file.mimetype;
 
   try {
