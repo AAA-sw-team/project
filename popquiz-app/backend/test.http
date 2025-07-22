@@ -11,17 +11,18 @@ POST http://localhost:3001/api/auth/login
 Content-Type: application/json
 
 {
-  "username": "test02",
+  "username": "",
   "password": "123456"
 }
 ### 创建讲座
 POST http://localhost:3001/api/lectures
 Content-Type: application/json
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsInJvbGUiOiJzcGVha2VyIiwiaWF0IjoxNzUzMDEzOTQ0LCJleHAiOjE3NTMwMjQ3NDR9.hemyEDJy5n2lr9705T9bqP1dFagRkpT5K1_SJRXfkfc
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsInJvbGUiOiJzcGVha2VyIiwiaWF0IjoxNzUzMTc0NjE4LCJleHAiOjE3NTMxODU0MTh9.Catg0o4qxVwkE_A_CINDeVBREoa5-VncbTS5teKzEa0
 
 {
-  "title": "测试讲座",
-  "description": "测试上传文件，生成题目"
+  "title": "重新测试",
+  "name":"杜博妍",
+  "description": "好烦好烦,不想测试！！！"
 }
 
 ### 生成问题（暂时用的模拟数据）
