@@ -39,28 +39,29 @@ const generateQuiz = async (req, res) => {
       quizIds.push(result.insertId);
     }
     res.status(200).json({ message: 'Quiz 生成成功', data: quizzes, quizIds });
-   
-// 批量发布题目
-// const publishQuizzes = async (req, res) => {  
-//   const { quizIds } = req.body;
-//   if (!Array.isArray(quizIds) || quizIds.length === 0) {
-//     return res.status(400).json({ error: 'quizIds 不能为空' });
-//   }
-//   try {
-//     const placeholders = quizIds.map(() => '?').join(',');
-//     await pool.promise().query(
-//       `UPDATE quizzes SET published = 1 WHERE id IN (${placeholders})`,
-//       quizIds
-//     );
-//     res.status(200).json({ message: '题目已全部发布' });
-//   } catch (error) {
-//     res.status(500).json({ error: '题目发布失败', detail: error.message });
-//   }
-// };
   } catch (error) {
     res.status(500).json({ error: 'Quiz 生成失败', detail: error.message });
   }
 }
+
+// 批量发布题目
+const publishQuizzes = async (req, res) => {
+  const { quizIds } = req.body;
+  if (!Array.isArray(quizIds) || quizIds.length === 0) {
+    return res.status(400).json({ error: 'quizIds 不能为空' });
+  }
+  try {
+    const placeholders = quizIds.map(() => '?').join(',');
+    await pool.promise().query(
+      `UPDATE quizzes SET published = 1 WHERE id IN (${placeholders})`,
+      quizIds
+    );
+    res.status(200).json({ message: '题目已全部发布' });
+  } catch (error) {
+    res.status(500).json({ error: '题目发布失败', detail: error.message });
+  }
+};
+
 //获取某讲座的所有quiz
 const getQuizzes = async (req, res) => {
   const lectureId = req.params.lectureId;
@@ -76,6 +77,6 @@ const getQuizzes = async (req, res) => {
 
 module.exports = {
   generateQuiz,
-  getQuizzes
-  //publishQuizzes
+  getQuizzes,
+  publishQuizzes,
 };
