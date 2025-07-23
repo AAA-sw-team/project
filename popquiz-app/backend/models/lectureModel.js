@@ -4,7 +4,6 @@ const pool = require('./db');
  * 新建讲座
  */
 async function createLecture_db(title, description, speakerId, name) {
-  // 新增唯一性校验
   const sql = 'INSERT INTO lectures (title, description, speaker_id, name, created_at) VALUES (?, ?, ?, ?, NOW())';
   return pool.promise().query(sql, [title, description, speakerId, name]);
 }
@@ -13,7 +12,7 @@ async function createLecture_db(title, description, speakerId, name) {
  * 获取所有讲座
  */
 async function getAllLectures_db() {
-  const sql = 'SELECT * FROM lectures ORDER BY created_at DESC';
+  const sql = 'SELECT id, title, description, name, created_at FROM lectures ORDER BY created_at DESC';
   return pool.promise().query(sql);
 }
 // 获取当前用户的讲座，按创建时间倒序
@@ -21,7 +20,7 @@ async function getAllLectures_db() {
  * 获取某用户的讲座
  */
 async function getLecturesByUser_db(userId) {
-  const sql = 'SELECT * FROM lectures WHERE speaker_id = ? ORDER BY created_at DESC';
+  const sql = 'SELECT id, title, description, name, created_at FROM lectures WHERE speaker_id = ? ORDER BY created_at DESC';
   return pool.promise().query(sql, [userId]);
 }
 // 删除讲座

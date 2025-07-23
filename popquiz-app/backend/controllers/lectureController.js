@@ -9,12 +9,12 @@ const {
 } = require('../models/lectureModel');
 const pool = require('../models/db');
 
- /* 创建讲座
-    POST /api/lectures
-    讲者专用，需登录
-    请求体: { title, description }
-    返回: { message, lecture: { id, title, name, created_at } }
- */
+/* 创建讲座
+   POST /api/lectures
+   讲者专用，需登录
+   请求体: { title, description }
+   返回: { message, lecture: { id, title, name, created_at } }
+*/
 async function createLecture(req, res) {
   const { title, description } = req.body;
   const user = req.user;
@@ -83,6 +83,7 @@ async function getAllLectures(req, res) {
       id: item.id,
       title: item.title,
       name: item.name,
+      description: item.description, // 新增
       created_at: item.created_at
     }));
     res.json(result);
@@ -104,6 +105,7 @@ async function getLecturesByUser(req, res) {
       id: item.id,
       title: item.title,
       name: item.name,
+      description: item.description, // 新增
       created_at: item.created_at
     }));
     res.json(result);
