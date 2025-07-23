@@ -29,6 +29,14 @@ app.use('/api/files', fileRouters);
 const uploadRoutes = require('./routers/uploadRouters');
 app.use('/api/upload', uploadRoutes);
 
+const participantRoutes = require('./routers/participantRoutes');
+app.use('/api/participants', participantRoutes);
+
+const feedbackRoutes = require('./routers/feedbackRoutes');
+app.use('/api/feedback', feedbackRoutes);
+
+const discussionRoutes = require('./routers/discussionRoutes');
+app.use('/api/discussion', discussionRoutes);
 
 app.get('/', (req, res) => {
   res.send('✅✅✅PopQuiz 后端启动成功！');
