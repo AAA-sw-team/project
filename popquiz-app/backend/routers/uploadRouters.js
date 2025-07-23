@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const authMiddleware = require('../middleware/authMiddleware');
-const { handleUpload } = require('../controllers/uploadController');
+const  handleUpload  = require('../controllers/uploadcontroller');
 
 // 设置文件上传路径和命名
 const storage = multer.diskStorage({
@@ -26,10 +26,23 @@ const storage = multer.diskStorage({
 console.log('[uploadRouters] 路由已加载，上传目录:', path.join(__dirname, '../../uploads'));
 const upload = multer({ storage });
 
-// 文件上传路由
-router.post('/:lectureId', (req, res, next) => {
-  console.log('[uploadRouters] 收到上传请求:', req.method, req.originalUrl);
-  next();
-}, authMiddleware, upload.single('file'), handleUpload);
+
+// 普通文件上传
+router.post('/:lectureId',
+  (req, res, next) => {
+    console.log('[uploadRouters] 收到上传请求:', req.method, req.originalUrl);
+    next();
+  },
+  authMiddleware,
+  upload.single('file'),
+  handleUpload.handleUpload
+);
+
+// 讲座录制内容上传（音频/视频）
+router.post('/:lectureId/media',
+  authMiddleware,
+  upload.single('file'),
+  handleUpload.uploadLectureMedia
+);
 
 module.exports = router;

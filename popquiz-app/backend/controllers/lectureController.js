@@ -1,3 +1,4 @@
+
 const {
   createLecture_db,
   getAllLectures_db,
@@ -8,12 +9,11 @@ const {
 } = require('../models/lectureModel');
 const pool = require('../models/db');
 
-/**
- * 创建讲座
- * POST /api/lectures
- * 讲者专用，需登录
- * 请求体: { title, description }
- * 返回: { message, lecture: { id, title, name, created_at } }
+ /* 创建讲座
+    POST /api/lectures
+    讲者专用，需登录
+    请求体: { title, description }
+    返回: { message, lecture: { id, title, name, created_at } }
  */
 async function createLecture(req, res) {
   const { title, description } = req.body;

@@ -1,79 +1,69 @@
 const pool = require('./db');
 
-// 删除 quiz
-const deleteQuiz = (quizId) => {
-  return pool.promise().query('DELETE FROM quizzes WHERE id = ?', [quizId]);
-};
-
-// 获取某文件所有已发布的 quiz
-const getPublishedQuizzesByFileId = (fileId) => {
-  return pool.promise().query(
-    'SELECT * FROM quizzes WHERE file_id = ? AND published = 1 ORDER BY created_at DESC',
-    [fileId]
-  );
-};
-
-// 获取某文件的所有 quiz
-const getQuizzesByFileId = (fileId) => {
-  return pool.promise().query(
-    'SELECT * FROM quizzes WHERE file_id = ? ORDER BY created_at DESC',
-    [fileId]
-  );
-};
-
-// 获取所有已发布的 quiz
-const getAllPublishedQuizzes = () => {
-  return pool.promise().query(
-    'SELECT * FROM quizzes WHERE published = 1 ORDER BY created_at DESC'
-  );
-};
-
-// 获取某讲座所有已发布的 quiz
-const getPublishedQuizzesByLectureId = (lectureId) => {
-  return pool.promise().query(
-    'SELECT * FROM quizzes WHERE lecture_id = ? AND published = 1 ORDER BY created_at DESC',
-    [lectureId]
-  );
-};
-
-// 设置 quiz 发布状态
-const setQuizPublished = (quizId, published) => {
-  return pool.promise().query(
-    'UPDATE quizzes SET published = ? WHERE id = ?',
-    [published, quizId]
-  );
-};
-
-// 获取单个 quiz
-const getQuizById = (quizId) => {
-  return pool.promise().query('SELECT * FROM quizzes WHERE id = ?', [quizId]);
-};
-
 // 插入 quiz
-const createQuiz = (lectureId, question, options, correctOption) => {
+async function createQuiz({ lectureId, question, options, correctOption, group_id, source_file_ids }) {
   const [a, b, c, d] = options;
-  return pool.promise().query(
-    'INSERT INTO quizzes (lecture_id, question, option_a, option_b, option_c, option_d, correct_option) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [lectureId, question, a, b, c, d, correctOption]
+  const [result] = await pool.promise().query(
+    'INSERT INTO quizzes (lecture_id, question, option_a, option_b, option_c, option_d, correct_option, group_id, source_file_ids) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [lectureId, question, a, b, c, d, correctOption, group_id, JSON.stringify(source_file_ids)]
   );
-};
+  return result.insertId;
+}
 
-// 获取某讲座的所有 quiz
-const getQuizzesByLectureId = (lectureId) => {
-  return pool.promise().query(
-    'SELECT * FROM quizzes WHERE lecture_id = ? ORDER BY created_at DESC',
+//删除单个quiz 
+function deleteQuiz(quizId) {
+  return pool.promise().query('DELETE FROM quizzes WHERE id = ?', [quizId]);
+}
+
+// 删除某讲座下指定 group_id 的所有题目 
+async function deleteQuizzes(lectureId, group_id) {
+  await pool.promise().query(
+    'DELETE FROM quizzes WHERE lecture_id = ? AND group_id = ?',
+    [lectureId, group_id]
+  );
+}
+
+
+//获取单个 quiz 
+function getQuizById(quizId) {
+  return pool.promise().query('SELECT * FROM quizzes WHERE id = ?', [quizId]);
+}
+
+
+//获取某讲座所有 quiz
+async function getQuizzes(lectureId) {
+  const [rows] = await pool.promise().query(
+    'SELECT id, question, option_a, option_b, option_c, option_d, correct_option, published, group_id, source_file_ids, created_at FROM quizzes WHERE lecture_id = ? ORDER BY created_at DESC',
     [lectureId]
   );
-};
+  return rows;
+}
+
+//获取某讲座下指定分组的所有题目 
+async function getQuizzesByGroupId(lectureId, group_id) {
+  const [rows] = await pool.promise().query(
+    'SELECT * FROM quizzes WHERE lecture_id = ? AND group_id = ? ORDER BY created_at DESC',
+    [lectureId, group_id]
+  );
+  return rows;
+}
+
+/** 批量发布题目 */
+async function publishQuizzes(quizIds) {
+  if (!Array.isArray(quizIds) || quizIds.length === 0) return;
+  const placeholders = quizIds.map(() => '?').join(',');
+  await pool.promise().query(
+    `UPDATE quizzes SET published = 1 WHERE id IN (${placeholders})`,
+    quizIds
+  );
+}
 
 module.exports = {
   createQuiz,
-  getQuizzesByLectureId,
-  setQuizPublished,
-  getQuizById,
-  getQuizzesByFileId,
-  getAllPublishedQuizzes,
-  getPublishedQuizzesByLectureId,
-  getPublishedQuizzesByFileId,
   deleteQuiz,
+  getQuizById,
+  getQuizzes,
+  publishQuizzes,
+  deleteQuizzes,
+  getQuizzesByGroupId
 };
