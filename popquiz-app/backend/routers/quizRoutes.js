@@ -1,13 +1,23 @@
+
 const express = require('express');
 const router = express.Router();
-const { generateQuiz, getQuizzes, publishQuizzes } = require('../controllers/quizController');
+const quizController= require('../controllers/quizController');
 const authMiddleware = require('../middleware/authMiddleware');
 
-//生成题目
-router.post('/generate/:lectureId', authMiddleware, generateQuiz);
+// 生成题目（支持多文件/录音/count/group_id）
+// POST /api/quizzes/generate/:id
+router.post('/generate/:id', authMiddleware, quizController.generateQuiz);
+
 // 批量发布题目
-router.post('/publish', authMiddleware, publishQuizzes);
-// 获取某讲座已发布的所有题目
-router.get('/:lectureId', getQuizzes);
+// POST /api/quizzes/publish
+router.post('/publish', authMiddleware, quizController.publishQuizzes);
+
+// 重新生成题目接口（先删后生成）
+// POST /api/quizzes/:id/quizzes/regenerate
+router.post('/:id/quizzes/regenerate', authMiddleware, quizController.RegenerateQuiz);
+
+// 获取某讲座所有 quiz（含未发布）
+// GET /api/quizzes/:lectureId
+router.get('/:lectureId', quizController.getQuizzes);
 
 module.exports = router;
