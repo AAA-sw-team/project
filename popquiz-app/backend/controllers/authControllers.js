@@ -25,7 +25,7 @@ exports.login = (req, res) => {
     const valid = bcrypt.compareSync(password, user.password);
     if (!valid) return res.status(401).json({ error: '密码错误' });
 
-    const token = jwt.sign({ userId: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '3h' });
+    const token = jwt.sign({ userId: user.id, role: user.role, name: user.nickname }, process.env.JWT_SECRET, { expiresIn: '3h' });
     res.json({ message: '登录成功', token, role: user.role, nickname: user.nickname });
   });
 };

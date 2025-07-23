@@ -15,12 +15,32 @@ async function appendLectureFileId(lectureId, fileId) {
   let fileIds = [];
   if (lectureRows.length && lectureRows[0].file_ids) {
     try {
-      fileIds = JSON.parse(lectureRows[0].file_ids);
+      // 兼容 file_ids 可能为 JSON 数组、逗号分隔字符串或单个数字
+      let raw = lectureRows[0].file_ids;
+      if (Array.isArray(raw)) {
+        fileIds = raw;
+      } else if (typeof raw === 'string') {
+        // 先尝试 JSON.parse
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            fileIds = parsed;
+          } else if (typeof parsed === 'string') {
+            fileIds = parsed.split(',').filter(Boolean);
+          } else {
+            fileIds = [];
+          }
+        } catch (e) {
+          fileIds = raw.split(',').filter(Boolean);
+        }
+      } else if (typeof raw === 'number') {
+        fileIds = [String(raw)];
+      }
     } catch (e) {
       fileIds = [];
     }
   }
-  fileIds.push(fileId);
+  fileIds.push(String(fileId));
   await pool.promise().query('UPDATE lectures SET file_ids = ? WHERE id = ?', [JSON.stringify(fileIds), lectureId]);
 }
 

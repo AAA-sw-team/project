@@ -6,16 +6,22 @@
         <input type="file" class="upload-input" @change="handleFile" accept=".pdf,.ppt,.pptx,.txt,.mp3,.mp4" />
         <span class="upload-btn">选择文件</span>
       </label>
-      <button class="main-btn" @click="generateQuiz" :disabled="!fileId">生成题目</button>
-      <button class="main-btn" @click="publishQuiz" :disabled="!quizzes.length">发布题目</button>
+      <button class="main-btn" @click="generateQuiz" :disabled="!fileId || (typeof fileId !== 'string' && !fileId)">生成题目</button>
+      <button class="main-btn" @click="publishQuiz" :disabled="!quizzes || !quizzes.length">发布题目</button>
     </div>
-    <p v-if="!fileId" class="tip">请先上传内容文件（支持PPT、PDF、文本、音频、视频等）</p>
-    <div v-if="quizzes.length" class="quiz-list-section">
+    <p v-if="!fileId || (typeof fileId !== 'string' && !fileId)" class="tip">请先上传内容文件（支持PPT、PDF、文本、音频、视频等）</p>
+    <div v-if="quizzes && quizzes.length" class="quiz-list-section">
       <h3 class="quiz-list-title">已生成题目</h3>
       <div class="quiz-bubble-list">
-        <div v-for="(quiz, idx) in quizzes" :key="quiz.id ?? idx" class="quiz-bubble">
+        <div v-for="(quiz, idx) in quizzes" :key="quiz && quiz.id ? quiz.id : idx" class="quiz-bubble">
           <div class="bubble-header">题目 {{ idx + 1 }}</div>
-          <QuizCard :quiz="quiz" :readonly="true" />
+          <div class="quiz-question">{{ quiz.question }}</div>
+          <ul class="quiz-options">
+            <li v-for="(opt, oidx) in quiz.options" :key="oidx">
+              <span>{{ String.fromCharCode(65 + oidx) }}. {{ opt }}</span>
+              <span v-if="quiz.correctOption && quiz.correctOption.toUpperCase() === String.fromCharCode(65 + oidx)">（正确答案）</span>
+            </li>
+          </ul>
         </div>
       </div>
     </div>
@@ -23,7 +29,6 @@
 </template>
 
 <script setup lang="ts">
-
 import { ref } from 'vue'
 import axios from 'axios'
 import { useRoute } from 'vue-router'
@@ -32,15 +37,14 @@ interface Quiz {
   id: string | number
   question: string
   options: string[]
+  correctOption?: string
 }
 
+const quizzes = ref([])
 const fileId = ref('')
-const quizzes = ref<Quiz[]>([])
 const route = useRoute()
-const lectureId = route.params.lectureId as string
+const lectureId = route.params.id
 
-
-// 获取本地token，支持Bearer
 function getAuthHeader() {
   const token = localStorage.getItem('token') || ''
   if (!token) return {}
@@ -49,39 +53,34 @@ function getAuthHeader() {
   }
 }
 
-const handleFile = async (e: any) => {
+const handleFile = async (e) => {
   const file = e.target.files[0]
   if (!file) return
   const formData = new FormData()
   formData.append('file', file)
-  // 调试日志
-  console.log('lectureId:', lectureId)
-  console.log('token:', localStorage.getItem('token'))
-  console.log('upload url:', `/api/quizzes/upload/${lectureId}`)
+  const token = localStorage.getItem('token')
+  const uploadUrl = `/api/upload/${lectureId}`
   try {
-    const res = await axios.post(`/api/quizzes/upload/${lectureId}`, formData, {
+    const res = await axios.post(uploadUrl, formData, {
       headers: {
-        ...getAuthHeader(),
+        Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`,
         'Content-Type': 'multipart/form-data'
       }
     })
-    console.log('upload response:', res)
-    fileId.value = res.data.fileId
+    fileId.value = res.data.file.id
+    alert('上传成功')
   } catch (err) {
-    console.error('upload error:', err)
-    if (err.response) {
-      console.error('error response:', err.response)
-    }
     alert('上传失败，请检查 lectureId、token、接口路径和后端日志！')
   }
 }
 
 const generateQuiz = async () => {
   if (!fileId.value) return
-  // 路径与后端保持一致
-  const res = await axios.post(`/api/quizzes/generate/${lectureId}`, { fileId: fileId.value }, {
-    headers: getAuthHeader()
-  })
+  const res = await axios.post(
+    `/api/quizzes/generate/${lectureId}`,
+    { file_ids: [fileId.value] },
+    { headers: getAuthHeader() }
+  )
   quizzes.value = res.data.quizzes
 }
 
@@ -95,16 +94,6 @@ const publishQuiz = async () => {
 </script>
 
 <style scoped>
-/* .upload-wrapper {
-  width: 100%;
-  padding: 1.2rem 3rem 2rem 3rem;
-  margin: 1.2rem 0 2.5rem 0;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-} */
-
 .upload-title {
   font-size: 2rem;
   font-weight: 700;
@@ -114,7 +103,6 @@ const publishQuiz = async () => {
 }
 .upload-form {
   width: 100%;
-  /* max-width: 500px; */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -203,6 +191,27 @@ const publishQuiz = async () => {
   font-weight: 600;
   margin-bottom: 0.7rem;
 }
+.quiz-question {
+  font-size: 1.08rem;
+  color: #222;
+  margin: 0.5em 0 0.5em 0;
+  font-weight: 500;
+}
+.quiz-options {
+  list-style: none;
+  padding-left: 0;
+  margin: 0.2em 0 0 0;
+}
+.quiz-options li {
+  margin-bottom: 0.2em;
+  font-size: 1.05rem;
+  color: #444;
+}
+.quiz-options li span:last-child {
+  color: #10a37f;
+  font-weight: bold;
+  margin-left: 0.5em;
+}
 @media (max-width: 900px) {
   .upload-form {
     max-width: 98vw;
@@ -215,9 +224,8 @@ const publishQuiz = async () => {
 }
 </style>
 
-<!-- ✅ 全局背景灰白设置 -->
 <style>
 body {
   background: #f5f5f5;
 }
-</style>
+</style> 

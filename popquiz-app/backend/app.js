@@ -15,7 +15,7 @@ const lectureRoutes = require('./routers/lectureRoutes');
 app.use('/api/lectures', lectureRoutes);
 
 const quizRoutes = require('./routers/quizRoutes');
-app.use('/api/quizzes',quizRoutes );
+app.use('/api/quizzes', quizRoutes);
 
 const answerRoutes = require('./routers/answerRoutes');
 app.use('/api/answers', answerRoutes);
@@ -23,8 +23,8 @@ app.use('/api/answers', answerRoutes);
 const statisticsRoutes = require('./routers/statisticsRoutes');
 app.use('/api/statistics', statisticsRoutes);
 
-const fileRoutes = require('./routers/fileRouters');
-app.use('/api/files', fileRoutes);
+const fileRouters = require('./routers/fileRouters');
+app.use('/api/files', fileRouters);
 
 const uploadRoutes = require('./routers/uploadRouters');
 app.use('/api/upload', uploadRoutes);

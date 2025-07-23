@@ -4,11 +4,15 @@
       <div class="speaker-home">
         <h2 class="speaker-title">讲座管理</h2>
         <button class="create-btn" @click="showCreate = true">+ 创建新讲座</button>
-        <div class="lecture-list">
+        <button class="create-btn" @click="toggleLectures">已有讲座</button>
+        <div v-if="showLectures" class="lecture-list">
           <div v-for="lecture in lectures" :key="lecture.id" class="lecture-card">
             <router-link :to="`/speaker/lecture/${lecture.id}/upload`">
               <div class="lecture-title">{{ lecture.title }}</div>
+              <div class="lecture-desc">{{ lecture.desc || '暂无简介' }}</div>
+              <div class="lecture-speaker">主讲人：{{ lecture.speaker }}</div>
             </router-link>
+            <button class="delete-btn" @click="deleteLecture(lecture.id)">删除</button>
           </div>
         </div>
         <div v-if="showCreate" class="modal-bg">
@@ -33,22 +37,111 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 const lectures = ref<{id: number, title: string, desc: string, speaker: string}[]>([])
 const showCreate = ref(false)
+const showLectures = ref(false)
 const newLecture = ref({ title: '', desc: '', speaker: '' })
 
+function toggleLectures() {
+  showLectures.value = !showLectures.value
+  if (showLectures.value && lectures.value.length === 0) {
+    fetchLectures()
+  }
+}
+
+async function fetchLectures() {
+  try {
+    const token = localStorage.getItem('token')
+    const res = await fetch('/api/lectures', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    if (res.ok) {
+      const data = await res.json()
+      lectures.value = data.map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        desc: item.description ,
+        speaker: item.name || ''
+      }))
+    }
+  } catch (e) {}
+}
+
 onMounted(() => {
-  lectures.value = [
-    { id: 1, title: 'Vue3 响应式原理', desc: '深入理解Vue3', speaker: '张三' },
-    { id: 2, title: 'JavaScript 进阶', desc: 'JS高阶技巧', speaker: '李四' }
-  ]
+  // 默认不加载讲座列表
 })
 
-function createLecture() {
-  if (!newLecture.value.title) return
-  const id = Date.now()
-  lectures.value.push({ id, ...newLecture.value })
-  showCreate.value = false
-  router.push(`/speaker/lecture/${id}/upload`)
-  newLecture.value = { title: '', desc: '', speaker: '' }
+async function createLecture() {
+  console.log('createLecture 被触发', newLecture.value)
+  if (!newLecture.value.title || !newLecture.value.desc || !newLecture.value.speaker) {
+    alert('讲座标题、简介和主讲人姓名均为必填！')
+    console.log('表单未填全', newLecture.value)
+    return
+  }
+  const token = localStorage.getItem('token')
+  console.log('token', token)
+  if (!token) {
+    alert('请先登录！')
+    return
+  }
+  let payload: any = null
+  try {
+    payload = JSON.parse(atob(token.split('.')[1]))
+  } catch (e) { console.log('token 解析失败', e) }
+  console.log('payload', payload)
+  if (!payload || payload.role !== 'speaker') {
+    alert('只有讲者可以创建讲座！')
+    return
+  }
+  try {
+    console.log('准备发起POST请求', {
+      title: newLecture.value.title,
+      description: newLecture.value.desc,
+      name: newLecture.value.speaker
+    })
+    const res = await fetch('/api/lectures/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        title: newLecture.value.title,
+        description: newLecture.value.desc,
+        name: newLecture.value.speaker
+      })
+    })
+    const data = await res.json()
+    console.log('后端响应', res.status, data)
+    if (res.ok && data.lecture) {
+      showCreate.value = false
+      await fetchLectures()
+      router.push(`/speaker/lecture/${data.lecture.id}/upload`)
+      newLecture.value = { title: '', desc: '', speaker: '' }
+    } else {
+      alert(data.error || '创建失败')
+    }
+  } catch (e) {
+    alert('网络错误')
+    console.log('请求异常', e)
+  }
+}
+
+async function deleteLecture(id: number) {
+  if (!confirm('确定要删除该讲座吗？')) return
+  const token = localStorage.getItem('token')
+  try {
+    const res = await fetch(`/api/lectures/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    const data = await res.json()
+    if (res.ok) {
+      await fetchLectures()
+    } else {
+      alert(data.error || '删除失败')
+    }
+  } catch (e) {
+    alert('网络错误')
+  }
 }
 </script>
 <style scoped>
@@ -198,6 +291,21 @@ function createLecture() {
   font-weight: 600;
   cursor: pointer;
   transition: background 0.18s;
+}
+.delete-btn {
+  margin-top: 10px;
+  background: #ff5252;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.delete-btn:hover {
+  background: #d32f2f;
 }
 @media (max-width: 600px) {
   .speaker-home {
