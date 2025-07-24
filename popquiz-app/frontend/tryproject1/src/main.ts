@@ -80,4 +80,89 @@ const router = createRouter({
   routes
 })
 
+// 路由守卫 - 防止已登录用户访问登录页，未登录用户访问需要认证的页面
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('token')
+  const isLoggedIn = !!token
+  
+  // 需要认证的路径
+  const protectedPaths = ['/speaker', '/listener', '/organizer']
+  const isProtectedPath = protectedPaths.some(path => to.path.startsWith(path))
+  
+  // 处理根路径 - 如果已登录，重定向到对应首页
+  if (to.path === '/' && isLoggedIn) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const userRole = payload.role
+      
+      if (userRole === 'speaker') {
+        next('/speaker/home')
+      } else if (userRole === 'listener') {
+        next('/listener/home')
+      } else {
+        next('/login')
+      }
+    } catch (e) {
+      localStorage.removeItem('token')
+      next('/login')
+    }
+    return
+  }
+  
+  // 如果用户已登录且试图访问登录或注册页面，重定向到对应首页
+  if (isLoggedIn && (to.path === '/login' || to.path === '/register')) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const userRole = payload.role
+      
+      if (userRole === 'speaker') {
+        next('/speaker/home')
+      } else if (userRole === 'listener') {
+        next('/listener/home')
+      } else {
+        next('/login')
+      }
+    } catch (e) {
+      // token无效，清除并重定向到登录页
+      localStorage.removeItem('token')
+      next('/login')
+    }
+  } 
+  // 如果用户未登录且试图访问需要认证的页面，重定向到登录页
+  else if (!isLoggedIn && isProtectedPath) {
+    next('/login')
+  } 
+  // 如果用户已登录且试图访问需要认证的页面，检查角色权限
+  else if (isLoggedIn && isProtectedPath) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const userRole = payload.role
+      
+      // 检查用户是否有权限访问该路径
+      if (to.path.startsWith('/speaker') && userRole !== 'speaker') {
+        next('/listener/home')
+      } else if (to.path.startsWith('/listener') && userRole !== 'listener') {
+        next('/speaker/home')
+      } else if (to.path.startsWith('/organizer') && userRole !== 'organizer') {
+        // 如果用户不是organizer，根据角色重定向
+        if (userRole === 'speaker') {
+          next('/speaker/home')
+        } else if (userRole === 'listener') {
+          next('/listener/home')
+        } else {
+          next('/login')
+        }
+      } else {
+        next()
+      }
+    } catch (e) {
+      // token无效，清除并重定向到登录页
+      localStorage.removeItem('token')
+      next('/login')
+    }
+  } else {
+    next()
+  }
+})
+
 createApp(App).use(router).mount('#app')
