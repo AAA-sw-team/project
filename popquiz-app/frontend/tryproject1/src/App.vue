@@ -5,7 +5,7 @@
       <div class="header-container">
         <div class="brand-section">
           <div class="brand-icon">🎓</div>
-          <h1 class="brand-title" @click="handleHomeClick" style="cursor: pointer;">PQ智能系统</h1>
+          <h1 class="brand-title">PQ智能系统</h1>
           <span class="brand-subtitle">智能讲座互动平台</span>
         </div>
         <nav class="header-nav">
@@ -14,6 +14,42 @@
               <span class="link-icon">🏠</span>
               <span class="link-text">首页</span>
             </a>
+            <!-- 讲座信息按钮 -->
+            <div class="lecture-info-dropdown" v-if="getUserRole() && getCurrentLecture()">
+              <a href="#" class="nav-link" @click.prevent="toggleLectureInfo" :class="{ active: showLectureInfo }">
+                <span class="link-icon">📚</span>
+                <span class="link-text">当前讲座</span>
+                <span class="dropdown-arrow" :class="{ rotated: showLectureInfo }">▼</span>
+              </a>
+              <div class="lecture-info-panel" v-show="showLectureInfo">
+                <div class="lecture-header">
+                  <h3 class="lecture-title">{{ getCurrentLecture().title }}</h3>
+                  <span class="lecture-status" :class="getCurrentLecture().status">{{ getLectureStatusText() }}</span>
+                </div>
+                <div class="lecture-details">
+                  <div class="lecture-item">
+                    <span class="item-icon">👤</span>
+                    <span class="item-label">讲者：</span>
+                    <span class="item-value">{{ getCurrentLecture().speaker }}</span>
+                  </div>
+                  <div class="lecture-item">
+                    <span class="item-icon">🕒</span>
+                    <span class="item-label">时间：</span>
+                    <span class="item-value">{{ formatLectureTime() }}</span>
+                  </div>
+                  <div class="lecture-item">
+                    <span class="item-icon">👥</span>
+                    <span class="item-label">参与：</span>
+                    <span class="item-value">{{ getCurrentLecture().participants }} 人</span>
+                  </div>
+                  <div class="lecture-item" v-if="getCurrentLecture().description">
+                    <span class="item-icon">📝</span>
+                    <span class="item-label">描述：</span>
+                    <span class="item-value">{{ getCurrentLecture().description }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div class="settings-dropdown" v-if="getUserRole()">
               <a href="#" class="nav-link" @click.prevent="toggleSettingsDropdown" :class="{ active: showSettingsDropdown }">
                 <span class="link-icon">⚙️</span>
@@ -68,13 +104,14 @@
 
 <script setup>
 import { useRoute, useRouter } from 'vue-router'
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 
 const route = useRoute()
 const router = useRouter()
 
 // 设置下拉菜单状态
 const showSettingsDropdown = ref(false)
+const showLectureInfo = ref(false)
 
 const isLectureLayout = computed(() => 
   route.path.startsWith('/speaker/lecture/') || route.path.startsWith('/listener/lecture/')
@@ -83,13 +120,25 @@ const isLectureLayout = computed(() =>
 // 设置下拉菜单处理
 const toggleSettingsDropdown = () => {
   showSettingsDropdown.value = !showSettingsDropdown.value
+  showLectureInfo.value = false // 关闭讲座信息面板
+}
+
+// 讲座信息面板处理
+const toggleLectureInfo = () => {
+  showLectureInfo.value = !showLectureInfo.value
+  showSettingsDropdown.value = false // 关闭设置下拉菜单
 }
 
 // 点击外部关闭下拉菜单
 const handleClickOutside = (event) => {
   const dropdown = event.target.closest('.settings-dropdown')
+  const lectureDropdown = event.target.closest('.lecture-info-dropdown')
+  
   if (!dropdown) {
     showSettingsDropdown.value = false
+  }
+  if (!lectureDropdown) {
+    showLectureInfo.value = false
   }
 }
 
@@ -117,10 +166,16 @@ const handleAccountSettings = () => {
 // 生命周期钩子
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  updateCurrentLecture() // 初始化当前讲座信息
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+})
+
+// 监听路由变化，更新当前讲座信息
+watch(route, () => {
+  updateCurrentLecture()
 })
 
 // 获取用户角色
@@ -146,8 +201,8 @@ const handleHomeClick = () => {
   } else if (userRole === 'listener') {
     router.push('/listener/home')
   } else {
-    // 未登录或无效token，跳转到登录页面
-    router.push('/login')
+    // 未登录时不做任何操作，防止跳转到登录页
+    return
   }
 }
 
@@ -164,8 +219,8 @@ const handleLogout = () => {
     // 清除任何其他可能的用户数据
     sessionStorage.clear()
     
-    // 跳转到登录页面
-    router.push('/login')
+    // 强制跳转到登录页面 - 这是唯一允许的回到登录页的方式
+    router.replace('/login')
     
     // 可选：显示退出成功的提示
     setTimeout(() => {
@@ -184,6 +239,104 @@ const isHomeActive = computed(() => {
   }
   return route.path === '/' || route.path === '/login'
 })
+
+// 获取当前讲座信息
+const getCurrentLecture = () => {
+  const userRole = getUserRole()
+  if (!userRole) {
+    return null
+  }
+  
+  // 优先从当前路由获取讲座信息
+  const isInLecture = route.path.includes('/lecture/')
+  if (isInLecture) {
+    const lectureId = route.params.id
+    if (lectureId) {
+      // 从路由参数获取讲座ID，返回对应的讲座信息
+      return getLectureById(lectureId)
+    }
+  }
+  
+  // 如果不在讲座页面，检查用户是否有当前参与的讲座
+  // 这里可以从localStorage、sessionStorage或API获取用户当前的讲座信息
+  const currentLectureId = localStorage.getItem('currentLectureId')
+  if (currentLectureId) {
+    return getLectureById(currentLectureId)
+  }
+  
+  return null
+}
+
+// 根据讲座ID获取讲座信息的辅助函数
+const getLectureById = (lectureId) => {
+  // 这里应该调用API获取真实的讲座数据
+  // 目前使用模拟数据
+  const mockLectureData = {
+    id: lectureId,
+    title: 'AI与机器学习前沿技术',
+    speaker: '张教授',
+    startTime: new Date(2024, 11, 25, 14, 0),
+    endTime: new Date(2024, 11, 25, 16, 0),
+    participants: 156,
+    status: 'active',
+    description: '探讨人工智能和机器学习的最新发展趋势，以及在各行业的应用前景。'
+  }
+  
+  // TODO: 替换为真实的API调用
+  // const response = await fetch(`/api/lectures/${lectureId}`)
+  // return await response.json()
+  
+  return mockLectureData
+}
+
+// 设置当前讲座ID（当用户进入讲座时调用）
+const setCurrentLecture = (lectureId) => {
+  if (lectureId) {
+    localStorage.setItem('currentLectureId', lectureId)
+  } else {
+    localStorage.removeItem('currentLectureId')
+  }
+}
+
+// 监听路由变化，自动设置当前讲座
+const updateCurrentLecture = () => {
+  if (route.path.includes('/lecture/')) {
+    const lectureId = route.params.id
+    if (lectureId) {
+      setCurrentLecture(lectureId)
+    }
+  }
+}
+
+// 获取讲座状态文本
+const getLectureStatusText = () => {
+  const lecture = getCurrentLecture()
+  if (!lecture) return ''
+  
+  const now = new Date()
+  if (now < lecture.startTime) {
+    return '即将开始'
+  } else if (now >= lecture.startTime && now <= lecture.endTime) {
+    return '进行中'
+  } else {
+    return '已结束'
+  }
+}
+
+// 格式化讲座时间
+const formatLectureTime = () => {
+  const lecture = getCurrentLecture()
+  if (!lecture) return ''
+  
+  const startTime = lecture.startTime
+  const endTime = lecture.endTime
+  
+  const formatTime = (date) => {
+    return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+  }
+  
+  return `${formatTime(startTime)} - ${formatTime(endTime)}`
+}
 </script>
 
 <style>
@@ -246,12 +399,6 @@ const isHomeActive = computed(() => {
   background-clip: text;
   margin: 0;
   letter-spacing: -0.5px;
-  transition: all 0.3s ease;
-}
-
-.brand-title:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.1);
 }
 
 .brand-subtitle {
@@ -275,6 +422,99 @@ const isHomeActive = computed(() => {
 
 .settings-dropdown {
   position: relative;
+}
+
+.lecture-info-dropdown {
+  position: relative;
+}
+
+.lecture-info-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  min-width: 320px;
+  z-index: 1001;
+  overflow: hidden;
+  margin-top: 0.5rem;
+  animation: dropdownSlideIn 0.3s ease-out;
+}
+
+.lecture-header {
+  padding: 1.5rem 1.5rem 1rem 1.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, rgba(62, 175, 124, 0.05) 0%, rgba(102, 126, 234, 0.05) 100%);
+}
+
+.lecture-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.5rem 0;
+  line-height: 1.3;
+}
+
+.lecture-status {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.lecture-status.active {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+}
+
+.lecture-status.upcoming {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+}
+
+.lecture-status.ended {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+  color: white;
+}
+
+.lecture-details {
+  padding: 1rem 1.5rem;
+}
+
+.lecture-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.lecture-item:last-child {
+  margin-bottom: 0;
+}
+
+.item-icon {
+  font-size: 1rem;
+  width: 1.2rem;
+  text-align: center;
+  margin-top: 0.1rem;
+}
+
+.item-label {
+  font-weight: 600;
+  color: #374151;
+  min-width: 3rem;
+}
+
+.item-value {
+  color: #6b7280;
+  flex: 1;
+  line-height: 1.4;
 }
 
 .dropdown-arrow {
@@ -505,6 +745,19 @@ main.content-wrapper {
     min-width: 180px;
   }
   
+  .lecture-info-panel {
+    right: -1rem;
+    min-width: 280px;
+  }
+  
+  .lecture-header {
+    padding: 1rem;
+  }
+  
+  .lecture-details {
+    padding: 0.75rem 1rem;
+  }
+  
   .dropdown-item {
     padding: 0.6rem 0.8rem;
     font-size: 0.85rem;
@@ -556,6 +809,28 @@ main.content-wrapper {
   .dropdown-menu {
     right: -2rem;
     min-width: 160px;
+  }
+  
+  .lecture-info-panel {
+    right: -2rem;
+    min-width: 260px;
+  }
+  
+  .lecture-title {
+    font-size: 1rem;
+  }
+  
+  .lecture-item {
+    margin-bottom: 0.75rem;
+  }
+  
+  .item-label {
+    min-width: 2.5rem;
+    font-size: 0.85rem;
+  }
+  
+  .item-value {
+    font-size: 0.85rem;
   }
   
   .dropdown-item {
