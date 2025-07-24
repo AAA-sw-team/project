@@ -167,16 +167,127 @@ const handleAccountSettings = () => {
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   updateCurrentLecture() // 初始化当前讲座信息
+  setupHistoryGuard() // 设置历史记录守卫
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  removeHistoryGuard() // 移除历史记录守卫
 })
 
 // 监听路由变化，更新当前讲座信息
 watch(route, () => {
   updateCurrentLecture()
+  
+  // 在路由变化后重新设置历史记录保护
+  const userRole = getUserRole()
+  if (userRole && historyGuardEnabled) {
+    setTimeout(() => {
+      const currentPath = route.path
+      if (currentPath !== '/login' && currentPath !== '/register') {
+        // 为新页面添加历史记录保护
+        for (let i = 0; i < 3; i++) {
+          history.pushState({ 
+            preventBack: true, 
+            originalPath: currentPath,
+            timestamp: Date.now(),
+            routeIndex: i
+          }, '', currentPath)
+        }
+      }
+    }, 50)
+  }
 })
+
+// 历史记录守卫相关
+let historyGuardEnabled = false
+
+// 设置历史记录守卫
+const setupHistoryGuard = () => {
+  const userRole = getUserRole()
+  if (!userRole) return
+  
+  historyGuardEnabled = true
+  
+  // 监听浏览器的 popstate 事件（后退/前进按钮）
+  window.addEventListener('popstate', handleBrowserNavigation)
+  
+  // 在历史记录中添加多个虚拟状态，使后退按钮无效
+  const currentPath = route.path
+  if (currentPath !== '/login' && currentPath !== '/register') {
+    // 清除可能存在的导航标记
+    sessionStorage.removeItem('homeButtonClicked')
+    
+    // 添加多个历史记录状态，确保后退按钮无法生效
+    setTimeout(() => {
+      // 添加多个相同的状态，使后退按钮失效
+      for (let i = 0; i < 5; i++) {
+        history.pushState({ 
+          preventBack: true, 
+          originalPath: currentPath,
+          timestamp: Date.now(),
+          index: i
+        }, '', currentPath)
+      }
+    }, 100)
+  }
+}
+
+// 移除历史记录守卫
+const removeHistoryGuard = () => {
+  historyGuardEnabled = false
+  window.removeEventListener('popstate', handleBrowserNavigation)
+}
+
+// 处理浏览器导航（后退/前进按钮）
+const handleBrowserNavigation = (event) => {
+  if (!historyGuardEnabled) return
+  
+  const userRole = getUserRole()
+  if (!userRole) return
+  
+  const currentPath = route.path
+  const targetPath = location.pathname
+  
+  // 防止后退到登录页面或注册页面
+  if (targetPath === '/login' || targetPath === '/register' || targetPath === '/') {
+    // 立即重新推送当前页面到历史记录，静默阻止导航
+    setTimeout(() => {
+      history.pushState({ preventBack: true, originalPath: currentPath }, '', currentPath)
+      router.replace(currentPath)
+    }, 0)
+    return
+  }
+  
+  // 如果用户试图通过浏览器后退按钮回到首页，静默拦截
+  const homePages = ['/speaker/home', '/listener/home']
+  if (homePages.includes(targetPath)) {
+    // 检查是否是通过首页按钮的合法导航
+    const isLegitimateNavigation = event.state?.allowNavigation || sessionStorage.getItem('homeButtonClicked')
+    
+    if (!isLegitimateNavigation) {
+      // 立即重新推送当前页面到历史记录，静默阻止导航
+      setTimeout(() => {
+        history.pushState({ preventBack: true, originalPath: currentPath }, '', currentPath)
+        router.replace(currentPath)
+      }, 0)
+      return
+    } else {
+      // 清除合法导航标记
+      sessionStorage.removeItem('homeButtonClicked')
+    }
+  }
+  
+  // 对于其他页面间的导航，也进行静默拦截以防止意外退出讲座
+  if (currentPath.includes('/lecture/') && !targetPath.includes('/lecture/')) {
+    // 如果用户在讲座中，阻止导航到讲座外的页面
+    setTimeout(() => {
+      history.pushState({ preventBack: true, originalPath: currentPath }, '', currentPath)
+      router.replace(currentPath)
+    }, 0)
+    return
+  }
+}
 
 // 获取用户角色
 const getUserRole = () => {
@@ -193,13 +304,47 @@ const getUserRole = () => {
 }
 
 // 首页按钮点击处理
-const handleHomeClick = () => {
+const handleHomeClick = async () => {
   const userRole = getUserRole()
   
   if (userRole === 'speaker') {
-    router.push('/speaker/home')
+    // 检查是否在讲座中
+    if (route.path.includes('/lecture/')) {
+      if (confirm('点击首页将退出当前讲座，确定要继续吗？')) {
+        try {
+          await exitCurrentLecture()
+          // 标记这是通过首页按钮的合法导航
+          sessionStorage.setItem('homeButtonClicked', 'true')
+          router.push('/speaker/home')
+        } catch (error) {
+          // 如果退出讲座失败，不进行导航
+          console.error('退出讲座失败，取消导航:', error)
+        }
+      }
+    } else {
+      // 标记这是通过首页按钮的合法导航
+      sessionStorage.setItem('homeButtonClicked', 'true')
+      router.push('/speaker/home')
+    }
   } else if (userRole === 'listener') {
-    router.push('/listener/home')
+    // 检查是否在讲座中
+    if (route.path.includes('/lecture/')) {
+      if (confirm('点击首页将退出当前讲座，确定要继续吗？')) {
+        try {
+          await exitCurrentLecture()
+          // 标记这是通过首页按钮的合法导航
+          sessionStorage.setItem('homeButtonClicked', 'true')
+          router.push('/listener/home')
+        } catch (error) {
+          // 如果退出讲座失败，不进行导航
+          console.error('退出讲座失败，取消导航:', error)
+        }
+      }
+    } else {
+      // 标记这是通过首页按钮的合法导航
+      sessionStorage.setItem('homeButtonClicked', 'true')
+      router.push('/listener/home')
+    }
   } else {
     // 未登录时不做任何操作，防止跳转到登录页
     return
@@ -210,22 +355,26 @@ const handleHomeClick = () => {
 const handleLogout = () => {
   showSettingsDropdown.value = false
   if (confirm('确定要退出登录吗？')) {
+    // 如果在讲座中，先退出讲座
+    if (route.path.includes('/lecture/')) {
+      exitCurrentLecture()
+    }
+    
+    // 移除历史记录守卫
+    removeHistoryGuard()
+    
     // 清除本地存储的认证信息
     localStorage.removeItem('token')
     localStorage.removeItem('authToken')
     localStorage.removeItem('user')
     localStorage.removeItem('userRole')
+    localStorage.removeItem('currentLectureId')
     
     // 清除任何其他可能的用户数据
     sessionStorage.clear()
     
-    // 强制跳转到登录页面 - 这是唯一允许的回到登录页的方式
-    router.replace('/login')
-    
-    // 可选：显示退出成功的提示
-    setTimeout(() => {
-      alert('已成功退出登录')
-    }, 100)
+    // 彻底清除历史记录，使用 location.replace 确保无法后退
+    window.location.replace('/login')
   }
 }
 
@@ -308,6 +457,100 @@ const updateCurrentLecture = () => {
   }
 }
 
+// 退出当前讲座
+const exitCurrentLecture = async () => {
+  const currentLecture = getCurrentLecture()
+  const userRole = getUserRole()
+  
+  if (!currentLecture || !userRole) {
+    return
+  }
+  
+  try {
+    // 获取用户信息
+    const token = localStorage.getItem('token')
+    if (!token) return
+    
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    const userId = payload.id || payload.userId || payload.sub
+    const userName = payload.name || payload.username || `${userRole}_${userId}`
+    
+    // 检查网络连接
+    if (!navigator.onLine) {
+      throw new Error('网络连接已断开，请检查网络连接后重试')
+    }
+    
+    // 调用后端API退出讲座
+    const response = await fetch(`http://localhost:3001/api/participants/leave/${currentLecture.id}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      // 添加超时和重试机制
+      signal: AbortSignal.timeout(10000) // 10秒超时
+    })
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: '服务器响应错误' }))
+      throw new Error(errorData.error || `服务器错误 (${response.status})`)
+    }
+    
+    const result = await response.json()
+    console.log(`用户 ${userId} (${userName}) 已退出讲座 ${currentLecture.id}`)
+    
+    // 听众退出讲座时不清除本地信息，以便重新进入未结束的讲座
+    // 只有当讲座已结束时才清除信息
+    if (userRole === 'speaker' || isLectureEnded(currentLecture)) {
+      localStorage.removeItem('currentLectureId')
+      localStorage.removeItem('currentLecture')
+    }
+    
+    // 根据用户角色显示不同的提示
+    const roleText = userRole === 'speaker' ? '讲者' : '听众'
+    const message = userRole === 'listener' && !isLectureEnded(currentLecture) 
+      ? `${roleText}已退出讲座"${currentLecture.title}"，您可以随时重新进入未结束的讲座`
+      : `${roleText}已成功退出讲座"${currentLecture.title}"`
+    
+    setTimeout(() => {
+      alert(message)
+    }, 100)
+    
+  } catch (error) {
+    console.error('退出讲座时发生错误:', error)
+    
+    // 根据错误类型提供不同的提示
+    let errorMessage = '退出讲座失败'
+    
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      errorMessage = '无法连接到服务器，请检查：\n1. 后端服务是否已启动\n2. 网络连接是否正常\n3. 服务器地址是否正确'
+    } else if (error.name === 'AbortError' || error.message.includes('timeout')) {
+      errorMessage = '请求超时，请检查网络连接或稍后重试'
+    } else if (error.message.includes('网络')) {
+      errorMessage = error.message
+    } else {
+      errorMessage = `退出讲座失败: ${error.message}`
+    }
+    
+    // 询问用户是否要继续（仅清除本地状态）
+    const continueAnyway = confirm(`${errorMessage}\n\n是否要继续退出讲座？（将清除本地状态）`)
+    
+    if (continueAnyway) {
+      // 用户选择继续，清除本地状态
+      if (userRole === 'speaker' || isLectureEnded(currentLecture)) {
+        localStorage.removeItem('currentLectureId')
+        localStorage.removeItem('currentLecture')
+      }
+      
+      const roleText = userRole === 'speaker' ? '讲者' : '听众'
+      alert(`${roleText}已在本地退出讲座，但服务器状态可能未同步`)
+    } else {
+      // 重新抛出错误，让调用者知道失败了
+      throw error
+    }
+  }
+}
+
 // 获取讲座状态文本
 const getLectureStatusText = () => {
   const lecture = getCurrentLecture()
@@ -321,6 +564,27 @@ const getLectureStatusText = () => {
   } else {
     return '已结束'
   }
+}
+
+// 判断讲座是否已结束
+const isLectureEnded = (lecture) => {
+  if (!lecture) return false
+  const now = new Date()
+  return now > lecture.endTime
+}
+
+// 判断讲座是否正在进行中
+const isLectureActive = (lecture) => {
+  if (!lecture) return false
+  const now = new Date()
+  return now >= lecture.startTime && now <= lecture.endTime
+}
+
+// 判断讲座是否即将开始
+const isLectureUpcoming = (lecture) => {
+  if (!lecture) return false
+  const now = new Date()
+  return now < lecture.startTime
 }
 
 // 格式化讲座时间

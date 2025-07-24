@@ -6,62 +6,87 @@
       <p class="subtitle animate-fade-in-delay">参与互动，检验学习成果</p>
     </div>
 
-    <div v-if="loading" class="loading-container">
-      <div class="loading-spinner"></div>
-      <p>AI正在生成题目，请稍候...</p>
-    </div>
-    
-    <div v-else-if="currentQuestion" class="quiz-content">
-      <div class="question-card">
-        <div class="question-header">
-          <div class="question-number">题目 {{ currentIndex + 1 }}</div>
-          <div class="progress-bar">
-            <div class="progress-fill" :style="{ width: `${((currentIndex + 1) / questions.length) * 100}%` }"></div>
-          </div>
-        </div>
-        
-        <div class="question-text">{{ currentQuestion.text }}</div>
-        
-        <div class="options-container">
-          <label v-for="(opt, idx) in currentQuestion.options" :key="idx" class="option-item" :class="{ selected: userAnswer === opt, disabled: answered }">
-            <input type="radio" :value="opt" v-model="userAnswer" :disabled="answered" />
-            <span class="option-content">{{ opt }}</span>
-            <span class="option-indicator"></span>
-          </label>
-        </div>
-        
-        <div v-if="answered" class="feedback-section">
-          <div v-if="isCorrect" class="feedback-correct">
-            <span class="feedback-icon">✅</span>
-            <span>回答正确！</span>
-          </div>
-          <div v-else class="feedback-wrong">
-            <span class="feedback-icon">❌</span>
-            <span>回答错误，正确答案是：{{ currentQuestion.answer }}</span>
-          </div>
-        </div>
-        
-        <div class="action-buttons">
-          <button v-if="!isLast" @click="nextQuestion" :disabled="!userAnswer" class="action-btn primary">
-            <span>下一题</span>
-            <span class="btn-icon">→</span>
-          </button>
-          <button v-else @click="submitPaper" :disabled="!userAnswer" class="action-btn submit">
-            <span class="btn-icon">📝</span>
-            <span>提交试卷</span>
-          </button>
-        </div>
+    <!-- 讲座已结束提示 -->
+    <div v-if="isLectureEnded" class="lecture-ended-notice">
+      <div class="notice-icon">⏰</div>
+      <h3>讲座已结束</h3>
+      <p>本次讲座已结束，您无法继续答题。请前往成绩页面查看您的答题情况，或在反馈页面提交您的意见。</p>
+      <div class="notice-actions">
+        <button @click="router.push(`/listener/lecture/${lectureId}/score`)" class="action-btn primary">
+          查看成绩
+        </button>
+        <button @click="router.push(`/listener/lecture/${lectureId}/feedback`)" class="action-btn secondary">
+          提交反馈
+        </button>
       </div>
     </div>
-    
-    <div v-else class="completion-state">
-      <div class="completion-icon">🎉</div>
-      <h3>答题完成！</h3>
-      <p>恭喜您完成了所有题目</p>
-      <router-link :to="`/listener/lecture/${lectureId}/score`" class="result-link">
-        <span class="link-icon">📊</span>
-        <span>查看成绩</span>
-      </router-link>
+
+    <!-- 讲座未开始提示 -->
+    <div v-else-if="isLectureUpcoming" class="lecture-upcoming-notice">
+      <div class="notice-icon">⏳</div>
+      <h3>讲座尚未开始</h3>
+      <p>讲座还未开始，请等待讲者开始讲座后再进行答题。</p>
+    </div>
+
+    <!-- 正常答题界面 -->
+    <div v-else>
+      <div v-if="loading" class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>AI正在生成题目，请稍候...</p>
+      </div>
+      
+      <div v-else-if="currentQuestion" class="quiz-content">
+        <div class="question-card">
+          <div class="question-header">
+            <div class="question-number">题目 {{ currentIndex + 1 }}</div>
+            <div class="progress-bar">
+              <div class="progress-fill" :style="{ width: `${((currentIndex + 1) / questions.length) * 100}%` }"></div>
+            </div>
+          </div>
+          
+          <div class="question-text">{{ currentQuestion.text }}</div>
+          
+          <div class="options-container">
+            <label v-for="(opt, idx) in currentQuestion.options" :key="idx" class="option-item" :class="{ selected: userAnswer === opt, disabled: answered }">
+              <input type="radio" :value="opt" v-model="userAnswer" :disabled="answered" />
+              <span class="option-content">{{ opt }}</span>
+              <span class="option-indicator"></span>
+            </label>
+          </div>
+          
+          <div v-if="answered" class="feedback-section">
+            <div v-if="isCorrect" class="feedback-correct">
+              <span class="feedback-icon">✅</span>
+              <span>回答正确！</span>
+            </div>
+            <div v-else class="feedback-wrong">
+              <span class="feedback-icon">❌</span>
+              <span>回答错误，正确答案是：{{ currentQuestion.answer }}</span>
+            </div>
+          </div>
+          
+          <div class="action-buttons">
+            <button v-if="!isLast" @click="nextQuestion" :disabled="!userAnswer" class="action-btn primary">
+              <span>下一题</span>
+              <span class="btn-icon">→</span>
+            </button>
+            <button v-else @click="submitPaper" :disabled="!userAnswer" class="action-btn submit">
+              <span class="btn-icon">📝</span>
+              <span>提交试卷</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <div v-else class="completion-state">
+        <div class="completion-icon">🎉</div>
+        <h3>答题完成！</h3>
+        <p>恭喜您完成了所有题目</p>
+        <router-link :to="`/listener/lecture/${lectureId}/score`" class="result-link">
+          <span class="link-icon">📊</span>
+          <span>查看成绩</span>
+        </router-link>
+      </div>
     </div>
   </div>
 </template>
@@ -83,8 +108,49 @@ const loading = ref(true)
 const currentQuestion = computed(() => questions.value[currentIndex.value])
 const isLast = computed(() => currentIndex.value === questions.value.length - 1)
 
+// 获取当前讲座信息
+const getCurrentLecture = () => {
+  const currentLectureId = localStorage.getItem('currentLectureId')
+  if (currentLectureId && currentLectureId === lectureId) {
+    // 模拟讲座数据，实际应该从API获取
+    return {
+      id: lectureId,
+      title: 'AI与机器学习前沿技术',
+      speaker: '张教授',
+      startTime: new Date(2024, 11, 25, 14, 0),
+      endTime: new Date(2024, 11, 25, 16, 0),
+      status: 'active'
+    }
+  }
+  return null
+}
+
+// 检查讲座状态
+const checkLectureStatus = () => {
+  const lecture = getCurrentLecture()
+  if (!lecture) return { ended: false, upcoming: false, active: false }
+  
+  const now = new Date()
+  return {
+    ended: now > lecture.endTime,
+    upcoming: now < lecture.startTime,
+    active: now >= lecture.startTime && now <= lecture.endTime
+  }
+}
+
+const lectureStatus = computed(() => checkLectureStatus())
+const isLectureEnded = computed(() => lectureStatus.value.ended)
+const isLectureUpcoming = computed(() => lectureStatus.value.upcoming)
+const isLectureActive = computed(() => lectureStatus.value.active)
+
 // 模拟AI生成题目（实际应调用后端API，AI生成题目并返回）
 async function fetchQuestions() {
+  // 如果讲座已结束或未开始，不加载题目
+  if (isLectureEnded.value || isLectureUpcoming.value) {
+    loading.value = false
+    return
+  }
+  
   loading.value = true
   // 这里用静态数据，实际应调用API
   await new Promise(r => setTimeout(r, 1000))
@@ -485,6 +551,61 @@ function submitPaper() {
   animation: fadeIn 0.6s ease-out 0.2s both;
 }
 
+/* 讲座状态提示样式 */
+.lecture-ended-notice,
+.lecture-upcoming-notice {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  padding: 3rem 2rem;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  margin: 2rem auto;
+  max-width: 600px;
+}
+
+.notice-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.lecture-ended-notice h3,
+.lecture-upcoming-notice h3 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 1rem;
+}
+
+.lecture-ended-notice p,
+.lecture-upcoming-notice p {
+  font-size: 1.1rem;
+  color: #6b7280;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+.notice-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.notice-actions .action-btn.secondary {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border: 2px solid rgba(107, 114, 128, 0.3);
+}
+
+.notice-actions .action-btn.secondary:hover {
+  background: rgba(107, 114, 128, 0.2);
+  color: #4b5563;
+  transform: translateY(-2px);
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .quiz-wrapper {
@@ -508,6 +629,20 @@ function submitPaper() {
   
   .action-btn {
     width: 100%;
+  }
+  
+  .lecture-ended-notice,
+  .lecture-upcoming-notice {
+    padding: 2rem 1.5rem;
+    margin: 1rem;
+  }
+  
+  .notice-icon {
+    font-size: 3rem;
+  }
+  
+  .notice-actions {
+    flex-direction: column;
   }
 }
 </style>
