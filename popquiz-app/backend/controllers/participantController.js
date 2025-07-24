@@ -190,7 +190,7 @@ const joinLecture = async (req, res) => {
     const lecture = lectureRows[0];
     
     // 检查讲座是否已结束
-    if (lecture.status === 2) {
+    if (lecture.status === 1) {
       return res.status(400).json({ error: '讲座已结束，无法加入' });
     }
 
@@ -261,10 +261,8 @@ const getMyJoinedLectures = async (req, res) => {
     const result = lectures.map(item => ({
       id: item.lecture_id,
       title: item.title,
-      desc: item.description,
-      speaker: item.speaker_name,
-      status: item.lecture_status, // 讲座状态：0未开始, 1进行中, 2已结束
-      participant_status: item.participant_status, // 参与者状态：'joined' 或 'left'
+      description: item.description,
+      speaker_name: item.speaker_name,
       joined_at: item.joined_at,
       lecture_created_at: item.lecture_created_at
     }));

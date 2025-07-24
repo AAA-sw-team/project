@@ -29,9 +29,6 @@ app.use('/api/files', fileRoutes);
 const uploadRoutes = require('./routers/uploadRouters');
 app.use('/api/upload', uploadRoutes);
 
-const participantRoutes = require('./routers/participantRoutes');
-app.use('/api/participants', participantRoutes);
-
 
 app.get('/', (req, res) => {
   res.send('✅✅✅PopQuiz 后端启动成功！');
