@@ -14,7 +14,7 @@
               <span class="link-icon">🏠</span>
               <span class="link-text">首页</span>
             </a>
-            <!-- 讲座信息按钮 -->
+            <!-- 当前讲座按钮（恢复并美化，显示真实数据） -->
             <div class="lecture-info-dropdown" v-if="getUserRole() && getCurrentLecture()">
               <a href="#" class="nav-link" @click.prevent="toggleLectureInfo" :class="{ active: showLectureInfo }">
                 <span class="link-icon">📚</span>
@@ -23,29 +23,29 @@
               </a>
               <div class="lecture-info-panel" v-show="showLectureInfo">
                 <div class="lecture-header">
-                  <h3 class="lecture-title">{{ getCurrentLecture().title }}</h3>
+                  <h3 class="lecture-title">{{ getCurrentLecture().title || '无' }}</h3>
                   <span class="lecture-status" :class="getCurrentLecture().status">{{ getLectureStatusText() }}</span>
                 </div>
                 <div class="lecture-details">
                   <div class="lecture-item">
                     <span class="item-icon">👤</span>
                     <span class="item-label">讲者：</span>
-                    <span class="item-value">{{ getCurrentLecture().speaker }}</span>
+                    <span class="item-value">{{ getCurrentLecture().speaker || '无' }}</span>
                   </div>
                   <div class="lecture-item">
                     <span class="item-icon">🕒</span>
                     <span class="item-label">时间：</span>
-                    <span class="item-value">{{ formatLectureTime() }}</span>
+                    <span class="item-value">{{ formatLectureTimePanel(getCurrentLecture()) }}</span>
                   </div>
                   <div class="lecture-item">
                     <span class="item-icon">👥</span>
                     <span class="item-label">参与：</span>
-                    <span class="item-value">{{ getCurrentLecture().participants }} 人</span>
+                    <span class="item-value">{{ getCurrentLecture().participants !== undefined ? getCurrentLecture().participants : '无' }}</span>
                   </div>
-                  <div class="lecture-item" v-if="getCurrentLecture().description">
+                  <div class="lecture-item">
                     <span class="item-icon">📝</span>
                     <span class="item-label">描述：</span>
-                    <span class="item-value">{{ getCurrentLecture().description }}</span>
+                    <span class="item-value">{{ getCurrentLecture().description || '无' }}</span>
                   </div>
                 </div>
               </div>
@@ -124,9 +124,42 @@ const toggleSettingsDropdown = () => {
 }
 
 // 讲座信息面板处理
-const toggleLectureInfo = () => {
+const toggleLectureInfo = async () => {
   showLectureInfo.value = !showLectureInfo.value
   showSettingsDropdown.value = false // 关闭设置下拉菜单
+  if (showLectureInfo.value) {
+    // 每次点击都重新拉取讲座信息和参与人数和状态
+    let lectureId = null
+    if (route.path.includes('/lecture/')) {
+      lectureId = route.params.id
+    } else {
+      lectureId = localStorage.getItem('currentLectureId')
+    }
+    if (lectureId) {
+      // 拉取讲座详情（含最新status）
+      const lecture = await fetchLectureById(lectureId)
+      // 拉取参与人数
+      let participantCount = '无'
+      try {
+        const token = localStorage.getItem('token')
+        const res = await fetch(`/api/participants/lecture/${lectureId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          participantCount = data.participant_count !== undefined ? data.participant_count : '无'
+        }
+      } catch {}
+      currentLecture.value = {
+        ...lecture,
+        participants: participantCount,
+        status: lecture.status // 确保最新状态
+      }
+    }
+  }
 }
 
 // 点击外部关闭下拉菜单
@@ -389,71 +422,85 @@ const isHomeActive = computed(() => {
   return route.path === '/' || route.path === '/login'
 })
 
-// 获取当前讲座信息
-const getCurrentLecture = () => {
-  const userRole = getUserRole()
-  if (!userRole) {
+// 获取当前讲座信息（真实接口）
+const currentLecture = ref(null)
+
+// 根据讲座ID获取讲座信息（真实接口，合并参与人数，并格式化时间）
+const fetchLectureById = async (lectureId) => {
+  if (!lectureId) return null
+  try {
+    const token = localStorage.getItem('token')
+    if (!token) return null
+    // 并发请求讲座详情和参与人数
+    const [lectureRes, participantRes] = await Promise.all([
+      fetch(`/api/lectures/${lectureId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }),
+      fetch(`/api/participants/lecture/${lectureId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+    ])
+    if (lectureRes.ok) {
+      const data = await lectureRes.json()
+      let participantCount = 0
+      if (participantRes.ok) {
+        const pdata = await participantRes.json()
+        participantCount = pdata.participant_count || 0
+      }
+      // 格式化时间
+      let formattedTime = ''
+      if (data.lecture.created_at) {
+        try {
+          formattedTime = new Date(data.lecture.created_at).toLocaleString('zh-CN', { hour12: false })
+        } catch (e) {
+          formattedTime = data.lecture.created_at
+        }
+      }
+      return {
+        id: data.lecture.id,
+        title: data.lecture.title,
+        speaker: data.lecture.name,
+        created_at: formattedTime,
+        status: data.lecture.status,
+        description: data.lecture.description,
+        participants: participantCount,
+        quizCount: (data.quizzes && Array.isArray(data.quizzes)) ? data.quizzes.length : 0,
+      }
+    }
+    return null
+  } catch (e) {
+    console.error('获取讲座信息失败:', e)
     return null
   }
-  
-  // 优先从当前路由获取讲座信息
-  const isInLecture = route.path.includes('/lecture/')
-  if (isInLecture) {
-    const lectureId = route.params.id
-    if (lectureId) {
-      // 从路由参数获取讲座ID，返回对应的讲座信息
-      return getLectureById(lectureId)
-    }
-  }
-  
-  // 如果不在讲座页面，检查用户是否有当前参与的讲座
-  // 这里可以从localStorage、sessionStorage或API获取用户当前的讲座信息
-  const currentLectureId = localStorage.getItem('currentLectureId')
-  if (currentLectureId) {
-    return getLectureById(currentLectureId)
-  }
-  
-  return null
 }
 
-// 根据讲座ID获取讲座信息的辅助函数
-const getLectureById = (lectureId) => {
-  // 这里应该调用API获取真实的讲座数据
-  // 目前使用模拟数据
-  const mockLectureData = {
-    id: lectureId,
-    title: 'AI与机器学习前沿技术',
-    speaker: '张教授',
-    startTime: new Date(2024, 11, 25, 14, 0),
-    endTime: new Date(2024, 11, 25, 16, 0),
-    participants: 156,
-    status: 'active',
-    description: '探讨人工智能和机器学习的最新发展趋势，以及在各行业的应用前景。'
-  }
-  
-  // TODO: 替换为真实的API调用
-  // const response = await fetch(`/api/lectures/${lectureId}`)
-  // return await response.json()
-  
-  return mockLectureData
+// 获取当前讲座信息
+const getCurrentLecture = () => {
+  return currentLecture.value
 }
 
-// 设置当前讲座ID（当用户进入讲座时调用）
-const setCurrentLecture = (lectureId) => {
-  if (lectureId) {
-    localStorage.setItem('currentLectureId', lectureId)
-  } else {
-    localStorage.removeItem('currentLectureId')
-  }
-}
-
-// 监听路由变化，自动设置当前讲座
-const updateCurrentLecture = () => {
+// 监听路由变化和页面加载，自动拉取讲座信息
+const updateCurrentLecture = async () => {
+  let lectureId = null
   if (route.path.includes('/lecture/')) {
-    const lectureId = route.params.id
-    if (lectureId) {
-      setCurrentLecture(lectureId)
+    lectureId = route.params.id
+  } else {
+    lectureId = localStorage.getItem('currentLectureId')
+  }
+  if (lectureId) {
+    const lecture = await fetchLectureById(lectureId)
+    currentLecture.value = lecture
+    if (lecture) {
+      localStorage.setItem('currentLectureId', lectureId)
     }
+  } else {
+    currentLecture.value = null
   }
 }
 
@@ -554,16 +601,11 @@ const exitCurrentLecture = async () => {
 // 获取讲座状态文本
 const getLectureStatusText = () => {
   const lecture = getCurrentLecture()
-  if (!lecture) return ''
-  
-  const now = new Date()
-  if (now < lecture.startTime) {
-    return '即将开始'
-  } else if (now >= lecture.startTime && now <= lecture.endTime) {
-    return '进行中'
-  } else {
-    return '已结束'
-  }
+  if (!lecture || lecture.status === undefined || lecture.status === null) return ''
+  if (lecture.status === 2) return '已结束'
+  if (lecture.status === 1) return '进行中'
+  if (lecture.status === 0) return '未开始'
+  return ''
 }
 
 // 判断讲座是否已结束
@@ -600,6 +642,31 @@ const formatLectureTime = () => {
   }
   
   return `${formatTime(startTime)} - ${formatTime(endTime)}`
+}
+
+// 新增格式化时间方法
+function formatLectureTimePanel(lecture) {
+  // 支持mock和真实数据
+  if (!lecture) return '无'
+  // mock数据有startTime/endTime，真实数据只有created_at
+  if (lecture.startTime && lecture.endTime) {
+    const format = d => `${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getDate().toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`
+    return `${format(lecture.startTime)} - ${format(lecture.endTime)}`
+  }
+  if (lecture.created_at) {
+    // 尝试解析created_at
+    try {
+      const d = new Date(lecture.created_at)
+      const mm = (d.getMonth()+1).toString().padStart(2,'0')
+      const dd = d.getDate().toString().padStart(2,'0')
+      const hh = d.getHours().toString().padStart(2,'0')
+      const min = d.getMinutes().toString().padStart(2,'0')
+      return `${mm}/${dd} ${hh}:${min}`
+    } catch {
+      return lecture.created_at
+    }
+  }
+  return '无'
 }
 </script>
 

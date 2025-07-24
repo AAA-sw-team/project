@@ -236,6 +236,7 @@ async function getLectureDetail(req, res) {
       return res.status(404).json({ error: '讲座不存在' });
     }
     const lecture = lectureRows[0];
+    console.log('lectureRows[0]:', lectureRows[0]);
     // 获取讲座文件列表
     const [fileRows] = await pool.promise().query('SELECT id, filename, filepath, filetype, uploaded_at FROM files WHERE lecture_id = ? ORDER BY uploaded_at DESC', [lectureId]);
     // 获取讲座题目列表
@@ -246,7 +247,8 @@ async function getLectureDetail(req, res) {
       title: lecture.title,
       name: lecture.name,
       created_at: lecture.created_at,
-      status: lecture.status
+      status: lecture.status,
+      description: lecture.description
     };
     const filesInfo = fileRows.map(f => ({
       id: f.id,
