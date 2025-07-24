@@ -1,11 +1,15 @@
 <template>
-  <div class="listener-home-bg">
+  <div class="main-content">
     <div class="listener-home">
       <h2 class="listener-title">讲座列表</h2>
       <div class="lecture-list">
         <div v-for="lecture in lectures" :key="lecture.id" class="lecture-card">
           <router-link :to="`/listener/lecture/${lecture.id}/quiz`">
             <div class="lecture-title">{{ lecture.title }}</div>
+            <div class="lecture-meta">
+              <span class="lecture-speaker">讲师：{{ lecture.name || lecture.speaker || '未知' }}</span>
+              <span class="lecture-time">创建时间：{{ formatTime(lecture.created_at || '') }}</span>
+            </div>
           </router-link>
         </div>
       </div>
@@ -13,16 +17,45 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-const lectures = ref<{id: number, title: string}[]>([])
-// 假设从后端获取讲座列表
-onMounted(async () => {
-  // 这里用静态数据，实际应调用API
-  lectures.value = [
-    { id: 1, title: 'Vue3 响应式原理' },
-    { id: 2, title: 'JavaScript 进阶' }
-  ]
+import { ref, onMounted, onUnmounted } from 'vue'
+interface Lecture {
+  id: number;
+  title: string;
+  status?: number;
+  name?: string;
+  speaker?: string;
+  created_at?: string;
+}
+const lectures = ref<Lecture[]>([])
+
+async function fetchLectures() {
+  const res = await fetch('/api/lectures')
+  if (res.ok) {
+    const allLectures = await res.json()
+    // 兼容没有status字段的情况，优先显示进行中，有就过滤，没有就全显示
+    if (allLectures.length && allLectures[0].status !== undefined) {
+      lectures.value = allLectures.filter((lecture: any) => lecture.status === 1)
+    } else {
+      lectures.value = allLectures
+    }
+    console.log('讲座数据:', lectures.value)
+  }
+}
+
+let timer: any = null
+onMounted(() => {
+  fetchLectures()
+  timer = setInterval(fetchLectures, 10000)
 })
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+})
+
+function formatTime(time: string) {
+  if (!time) return '无';
+  const d = new Date(time)
+  return d.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
 </script>
 <style scoped>
 .listener-home-bg {
@@ -103,6 +136,22 @@ onMounted(async () => {
   width: 100%;
   display: block;
 }
+.lecture-meta {
+  margin-top: 10px;
+  font-size: 0.98rem;
+  color: #4b9087;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+.lecture-speaker {
+  font-weight: 500;
+}
+.lecture-time {
+  font-size: 0.92rem;
+  color: #7bb7b0;
+}
 @media (max-width: 600px) {
   .listener-home {
     padding: 24px 0 24px 0;
@@ -117,5 +166,12 @@ onMounted(async () => {
     font-size: 1.3rem;
     margin-bottom: 18px;
   }
+}
+.main-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
 }
 </style>

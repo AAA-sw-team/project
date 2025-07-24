@@ -45,25 +45,30 @@ const loading = ref(true)
 const currentQuestion = computed(() => questions.value[currentIndex.value])
 const isLast = computed(() => currentIndex.value === questions.value.length - 1)
 
-// 模拟AI生成题目（实际应调用后端API，AI生成题目并返回）
+// 获取后端AI生成的题目
 async function fetchQuestions() {
   loading.value = true
-  // 这里用静态数据，实际应调用API
-  await new Promise(r => setTimeout(r, 1000))
-  questions.value = [
-    {
-      text: 'Vue3的响应式原理基于什么？',
-      options: ['Proxy', 'Object.defineProperty', 'Class', 'Reflect'],
-      answer: 'Proxy'
-    },
-    {
-      text: 'JavaScript的基本数据类型不包括？',
-      options: ['String', 'Number', 'Class', 'Boolean'],
-      answer: 'Class'
+  const token = localStorage.getItem('authToken')
+  const res = await fetch(`/api/quizzes/${lectureId}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
     }
-  ]
+  })
+  if (res.ok) {
+    const data = await res.json()
+    // 题目格式适配
+    questions.value = data.map((q: any) => ({
+      text: q.question,
+      options: [q.option_a, q.option_b, q.option_c, q.option_d],
+      answer: q.correct_option
+    }))
+  } else {
+    questions.value = []
+  }
   loading.value = false
 }
+
 onMounted(fetchQuestions)
 
 function nextQuestion() {

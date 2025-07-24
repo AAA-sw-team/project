@@ -254,6 +254,7 @@ const handleLogin = async () => {
     if (res.data.message === '登录成功' && res.data.token) {
       // 登录成功
       localStorage.setItem('token', res.data.token)
+      localStorage.setItem('authToken', res.data.token)
       localStorage.setItem('userRole', res.data.role || role.value)
       localStorage.setItem('username', username.value)
       localStorage.setItem('nickname', res.data.nickname || username.value)

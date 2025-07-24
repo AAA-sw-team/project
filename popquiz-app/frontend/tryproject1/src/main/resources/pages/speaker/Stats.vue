@@ -2,9 +2,9 @@
   <div class="stats-wrapper">
     <div class="page-header">
       <div class="title-icon animate-bounce">📊</div>
-      <h2 class="stats-title animate-fade-in">讲座统计数据</h2>
-      <p class="subtitle animate-fade-in-delay" v-if="lecture">{{ lecture.title }} - 答题统计分析</p>
-      <p class="subtitle animate-fade-in-delay" v-else>查看当前讲座的参与情况和答题统计</p>
+      <h2 class="stats-title animate-fade-in">
+        {{ lecture && lecture.title ? lecture.title : '讲座统计' }}
+      </h2>
     </div>
     
     <div v-if="loading" class="loading-container">
@@ -12,7 +12,7 @@
       <p>正在加载统计数据...</p>
     </div>
     
-    <div v-else-if="!lecture" class="empty-state">
+    <div v-else-if="!lecture || !lecture.title" class="empty-state">
       <div class="empty-icon">📚</div>
       <h3>暂无讲座数据</h3>
       <p>未找到当前讲座的统计信息。</p>
@@ -25,17 +25,25 @@
         <div class="lecture-meta">
           <span class="meta-item">
             <i class="icon">👥</i>
-            参与人数: {{ lecture.participantCount || 0 }}
+            参与人数: {{ participants.length }}
           </span>
           <span class="meta-item">
             <i class="icon">📝</i>
             题目数量: {{ lecture.quizCount || 0 }}
           </span>
-          <span class="meta-item">
-            <i class="icon">📅</i>
-            {{ formatDate(lecture.created_at) }}
-          </span>
         </div>
+      </div>
+
+      <!-- 新增：参与者答题情况 -->
+      <div class="participants-list" v-if="participants.length">
+        <h3>👤 讲座参与者及答题情况</h3>
+        <ul>
+          <li v-for="p in participants" :key="p.user_id" class="participant-item">
+            <span>{{ p.nickname || p.username }}</span>
+            <span v-if="p.hasAnswered" class="answered">✔ 已答题</span>
+            <span v-else class="not-answered">✘ 未答题</span>
+          </li>
+        </ul>
       </div>
 
       <!-- 讲座整体统计 -->
@@ -165,6 +173,7 @@ const loading = ref(true)
 const lecture = ref<any>(null)
 const selectedUser = ref<any>(null)
 const selectedUserAnswers = ref<any[]>([])
+const participants = ref<any[]>([])
 
 // 获取讲座基本信息
 const fetchLectureInfo = async (id: string) => {
@@ -258,6 +267,28 @@ const fetchUserAnswers = async (userId: number) => {
   }
 }
 
+// 获取讲座参与者列表
+const fetchParticipants = async () => {
+  const token = localStorage.getItem('authToken')
+  const res = await fetch(`/api/participants/lecture/${lectureId}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  if (res.ok) {
+    const data = await res.json()
+    participants.value = data.participants || []
+  }
+}
+
+// 标记是否已答题
+const markAnsweredStatus = () => {
+  // userRankings 里有答题的用户
+  const answeredIds = new Set((lecture.value?.userRankings || []).map((u: any) => u.user_id))
+  participants.value = participants.value.map((p: any) => ({
+    ...p,
+    hasAnswered: answeredIds.has(p.user_id)
+  }))
+}
+
 // 加载当前讲座的数据
 const loadData = async () => {
   if (!lectureId) {
@@ -270,8 +301,10 @@ const loadData = async () => {
   try {
     // 获取讲座基本信息
     const lectureInfo = await fetchLectureInfo(lectureId as string)
-    if (!lectureInfo) {
+    console.log('lectureInfo', lectureInfo)
+    if (!lectureInfo || !lectureInfo.title) {
       console.error('无法获取讲座信息')
+      lecture.value = getMockData()
       loading.value = false
       return
     }
@@ -291,7 +324,9 @@ const loadData = async () => {
       quizStats: quizStats || [],
       quizCount: (quizStats || []).length
     }
-    
+    // 新增：加载参与者并标记答题状态
+    await fetchParticipants()
+    markAnsweredStatus()
   } catch (error) {
     console.error('加载数据失败:', error)
     // 如果API调用失败，使用模拟数据
@@ -940,6 +975,38 @@ onMounted(() => {
   color: #6b7280;
   font-size: 0.9rem;
   font-style: italic;
+}
+
+.participants-list {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 1.2rem 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e0e7ef;
+}
+.participants-list h3 {
+  color: #10a37f;
+  font-size: 1.08rem;
+  margin-bottom: 0.8rem;
+}
+.participant-item {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  font-size: 1rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #e0e7ef;
+}
+.participant-item:last-child {
+  border-bottom: none;
+}
+.answered {
+  color: #10a37f;
+  font-weight: 600;
+}
+.not-answered {
+  color: #ef4444;
+  font-weight: 600;
 }
 
 /* 动画样式 */

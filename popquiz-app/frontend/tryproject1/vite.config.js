@@ -5,12 +5,10 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     proxy: {
-      // 代理所有 /api 请求到后端
       '/api': {
-        target: 'http://localhost:3001', // 你的后端服务地址
+        target: 'http://localhost:3001', // 后端实际端口
         changeOrigin: true,
-        // 如果后端没有 /api 前缀，需要重写路径
-        // rewrite: (path) => path.replace(/^\/api/, '')
+        rewrite: path => path.replace(/^\/api/, '/api')
       }
     }
   }
