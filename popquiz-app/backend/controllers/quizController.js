@@ -41,8 +41,27 @@ const generateQuiz = async (req, res) => {
     const quizzes = await generateQuizFromText(allText, count);
     const group_id = uuidv4();
     const quizIds = [];
+    
+    console.log('AI生成的原始题目数据:', quizzes);
+    
     for (const q of quizzes) {
-      const correctOption = (q.correct_option || '').trim().charAt(0).toUpperCase();
+      // 改进正确答案处理逻辑
+      let correctOption = 'A'; // 默认值
+      if (q.correct_option) {
+        const option = q.correct_option.toString().trim().toUpperCase();
+        const match = option.match(/[ABCD]/);
+        if (match) {
+          correctOption = match[0];
+        }
+      }
+      
+      console.log('处理题目:', {
+        question: q.question,
+        original_correct: q.correct_option,
+        processed_correct: correctOption,
+        options: [q.option_a, q.option_b, q.option_c, q.option_d]
+      });
+      
       const quizId = await quizModel.createQuiz({
         lectureId,
         question: q.question,
@@ -127,8 +146,27 @@ const RegenerateQuiz = async (req, res) => {
     const quizzes = await generateQuizFromText(allText, count);
     const new_group_id = uuidv4();
     const quizIds = [];
+    
+    console.log('AI重新生成的原始题目数据:', quizzes);
+    
     for (const q of quizzes) {
-      const correctOption = (q.correct_option || '').trim().charAt(0).toUpperCase();
+      // 改进正确答案处理逻辑
+      let correctOption = 'A'; // 默认值
+      if (q.correct_option) {
+        const option = q.correct_option.toString().trim().toUpperCase();
+        const match = option.match(/[ABCD]/);
+        if (match) {
+          correctOption = match[0];
+        }
+      }
+      
+      console.log('重新生成处理题目:', {
+        question: q.question,
+        original_correct: q.correct_option,
+        processed_correct: correctOption,
+        options: [q.option_a, q.option_b, q.option_c, q.option_d]
+      });
+      
       const quizId = await quizModel.createQuiz({
         lectureId,
         question: q.question,
@@ -145,9 +183,21 @@ const RegenerateQuiz = async (req, res) => {
   }
 };
 
+// 删除单个题目
+const deleteQuiz = async (req, res) => {
+  const quizId = req.params.quizId;
+  try {
+    await quizModel.deleteQuiz(quizId);
+    res.status(200).json({ message: '题目删除成功' });
+  } catch (error) {
+    res.status(500).json({ error: '题目删除失败', detail: error.message });
+  }
+};
+
 module.exports = {
   generateQuiz,
   getQuizzes,
   publishQuizzes,
-  RegenerateQuiz
+  RegenerateQuiz,
+  deleteQuiz
 };

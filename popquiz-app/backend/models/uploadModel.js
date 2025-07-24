@@ -1,10 +1,10 @@
 const pool = require('./db');
 
 // 插入文件记录
-async function insertFile({ lectureId, speakerId, filename, filepath, filetype }) {
+async function insertFile({ lectureId, speakerId, filename, originalName, filepath, filetype, fileSize }) {
   const [result] = await pool.promise().query(
     'INSERT INTO files (lecture_id, speaker_id, filename, filepath, filetype) VALUES (?, ?, ?, ?, ?)',
-    [lectureId, speakerId, filename, filepath, filetype]
+    [lectureId, speakerId, originalName || filename, filepath, filetype]
   );
   return result.insertId;
 }

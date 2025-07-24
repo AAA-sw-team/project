@@ -1,10 +1,10 @@
 <template>
   <div class="lecture-layout">
     <aside class="sidebar">
-      <router-link :to="`/speaker/lecture/${lectureId}/upload`" :class="{active: isActive('upload')}">上传文件</router-link>
+      <router-link :to="`/speaker/lecture/${lectureId}/upload`" :class="{active: isActive('upload')}">生成题目</router-link>
       <router-link :to="`/speaker/lecture/${lectureId}/stats`" :class="{active: isActive('stats')}">答题情况</router-link>
-      <router-link :to="`/speaker/lecture/${lectureId}/discussion`" :class="{active: isActive('discussion')}">讨论</router-link>
-      <router-link :to="`/speaker/lecture/${lectureId}/feedback`" :class="{active: isActive('feedback')}">反馈</router-link>
+      <router-link :to="`/speaker/lecture/${lectureId}/discussion`" :class="{active: isActive('discussion')}">师生讨论</router-link>
+      <router-link :to="`/speaker/lecture/${lectureId}/feedback`" :class="{active: isActive('feedback')}">学生反馈</router-link>
     </aside>
     <main class="content">
       <div class="content-card">
@@ -24,23 +24,25 @@ function isActive(tab: string) {
 <style scoped>
 .lecture-layout {
   display: flex;
-  min-height: 80vh;
+  min-height: 100vh;
   background: linear-gradient(90deg, #e0f7fa 0%, #f6fcfa 100%);
-  border-radius: 18px;
-  box-shadow: 0 4px 24px rgba(64,158,255,0.07);
+  border-radius: 0;
+  box-shadow: none;
   margin: 0;
-  max-width: 100vw;
   width: 100vw;
-  margin-top: 80px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 999;
+  overflow: hidden;
 }
 .sidebar {
   width: 200px;
   min-width: 140px;
   background: linear-gradient(135deg, #a8e6cf 0%, #f5f5f5 100%);
-  border-top-left-radius: 18px;
-  border-bottom-left-radius: 18px;
+  border-radius: 0;
   box-shadow: 2px 0 12px rgba(44,209,171,0.07);
-  padding: 40px 0 40px 0;
+  padding: 120px 0 40px 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -65,37 +67,39 @@ function isActive(tab: string) {
 }
 .content {
   flex: 1;
-  padding: 48px 32px;
+  padding: 120px 32px 48px 32px;
   display: flex;
   align-items: flex-start;
   justify-content: center;
   min-width: 0;
+  overflow-y: auto;
+  height: 100vh;
 }
 .content-card {
   width: 100%;
   max-width: 900px;
   background: #fff;
-  border-radius: 18px;
+  border-radius: 0;
   box-shadow: 0 2px 12px rgba(44,209,171,0.07);
   padding: 36px 28px;
-  min-height: 400px;
+  min-height: calc(100vh - 200px);
   box-sizing: border-box;
+  margin-bottom: 2rem;
 }
 @media (max-width: 900px) {
   .lecture-layout {
     flex-direction: column;
-    min-height: unset;
-    border-radius: 12px;
-    max-width: 100vw;
+    min-height: 100vh;
+    border-radius: 0;
     width: 100vw;
   }
   .sidebar {
     flex-direction: row;
     width: 100%;
     min-width: unset;
-    border-radius: 12px 12px 0 0;
+    border-radius: 0;
     box-shadow: 0 2px 8px rgba(44,209,171,0.07);
-    padding: 18px 0 10px 0;
+    padding: 98px 0 18px 0;
     align-items: center;
     justify-content: center;
     gap: 0;
@@ -109,12 +113,14 @@ function isActive(tab: string) {
   }
   .content {
     padding: 18px 4vw;
+    overflow-y: auto;
+    height: calc(100vh - 120px);
   }
   .content-card {
     padding: 18px 8px;
     min-height: 200px;
-    border-radius: 12px;
-    max-width: 100vw;
+    border-radius: 0;
+    width: 100%;
   }
 }
 </style> 

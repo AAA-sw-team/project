@@ -15,17 +15,21 @@ const handleUpload = async (req, res) => {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  const filename = file.originalname;
+  const filename = file.filename; // 系统生成的文件名
+  const originalName = file.originalname; // 用户上传的原始文件名
   const filepath = file.path;
   const filetype = file.mimetype;
+  const fileSize = file.size;
 
   try {
     const fileId = await uploadModel.insertFile({
       lectureId,
       speakerId: req.user.userId,
       filename,
+      originalName,
       filepath,
-      filetype
+      filetype,
+      fileSize
     });
     console.log('文件信息已保存到数据库，id:', fileId);
     try {
@@ -37,8 +41,10 @@ const handleUpload = async (req, res) => {
     const fileInfo = {
       id: fileId,
       filename,
+      original_name: originalName,
       filepath,
       filetype,
+      size: fileSize,
       uploaded_at: new Date().toISOString()
     };
     res.status(200).json({

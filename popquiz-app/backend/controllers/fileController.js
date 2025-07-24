@@ -5,11 +5,12 @@ const fileModel = require('../models/fileModel');
 
 // 获取讲座已上传文件列表
 const getLectureFiles = async (req, res) => {
-  const lectureId = req.params.id;
+  const lectureId = req.params.lectureId;
   try {
     const files = await fileModel.getFilesByLectureId(lectureId);
-    res.json(files);
+    res.json({ files });
   } catch (err) {
+    console.error('获取讲座文件失败:', err);
     res.status(500).json({ error: '获取讲座文件失败' });
   }
 };

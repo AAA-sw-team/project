@@ -15,7 +15,7 @@ const lectureRoutes = require('./routers/lectureRoutes');
 app.use('/api/lectures', lectureRoutes);
 
 const quizRoutes = require('./routers/quizRoutes');
-app.use('/api/quizzes', quizRoutes);
+app.use('/api/quizzes',quizRoutes );
 
 const answerRoutes = require('./routers/answerRoutes');
 app.use('/api/answers', answerRoutes);
@@ -23,20 +23,12 @@ app.use('/api/answers', answerRoutes);
 const statisticsRoutes = require('./routers/statisticsRoutes');
 app.use('/api/statistics', statisticsRoutes);
 
-const fileRouters = require('./routers/fileRouters');
-app.use('/api/files', fileRouters);
+const fileRoutes = require('./routers/fileRouters');
+app.use('/api/files', fileRoutes);
 
 const uploadRoutes = require('./routers/uploadRouters');
 app.use('/api/upload', uploadRoutes);
 
-const participantRoutes = require('./routers/participantRoutes');
-app.use('/api/participants', participantRoutes);
-
-const feedbackRoutes = require('./routers/feedbackRoutes');
-app.use('/api/feedback', feedbackRoutes);
-
-const discussionRoutes = require('./routers/discussionRoutes');
-app.use('/api/discussion', discussionRoutes);
 
 app.get('/', (req, res) => {
   res.send('✅✅✅PopQuiz 后端启动成功！');

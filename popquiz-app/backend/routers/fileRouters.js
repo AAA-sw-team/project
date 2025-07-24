@@ -4,7 +4,7 @@ const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 
 // 获取讲座已上传文件列表
-router.get('/file/:lectureId', authMiddleware, fileController.getLectureFiles);
+router.get('/:lectureId', authMiddleware, fileController.getLectureFiles);
 
 // 获取所有文件（需登录）
 router.get('/all', authMiddleware, fileController.getAllFiles);

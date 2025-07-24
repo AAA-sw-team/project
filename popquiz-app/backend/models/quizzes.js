@@ -58,12 +58,23 @@ async function publishQuizzes(quizIds) {
   );
 }
 
+/** 批量发布某讲座的题目 */
+async function publishLectureQuizzes(lectureId, quizIds) {
+  if (!Array.isArray(quizIds) || quizIds.length === 0) return;
+  const placeholders = quizIds.map(() => '?').join(',');
+  await pool.promise().query(
+    `UPDATE quizzes SET published = 1 WHERE lecture_id = ? AND id IN (${placeholders})`,
+    [lectureId, ...quizIds]
+  );
+}
+
 module.exports = {
   createQuiz,
   deleteQuiz,
   getQuizById,
   getQuizzes,
   publishQuizzes,
+  publishLectureQuizzes,
   deleteQuizzes,
   getQuizzesByGroupId
 };

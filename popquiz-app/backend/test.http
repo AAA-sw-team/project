@@ -1,0 +1,74 @@
+### speaker登录获取 token
+POST http://localhost:3001/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "test01",
+  "password": "123456"
+}
+
+### 测试重新开始讲座接口 (需要先获取token，并替换下面的TOKEN和LECTURE_ID)
+POST http://localhost:3001/api/lectures/1/restart
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsInJvbGUiOiJzcGVha2VyIiwiaWF0IjoxNzUzMTc0NjE4LCJleHAiOjE3NTMxODU0MTh9.Catg0o4qxVwkE_A_CINDeVBREoa5-VncbTS5teKzEa0
+Content-Type: application/json
+
+### 查看我的讲座列表
+GET http://localhost:3001/api/lectures/my
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsInJvbGUiOiJzcGVha2VyIiwiaWF0IjoxNzUzMTc0NjE4LCJleHAiOjE3NTMxODU0MTh9.Catg0o4qxVwkE_A_CINDeVBREoa5-VncbTS5teKzEa0
+
+### listener登录获取 token
+POST http://localhost:3001/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "",
+  "password": "123456"
+}
+### 创建讲座
+POST http://localhost:3001/api/lectures
+Content-Type: application/json
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsInJvbGUiOiJzcGVha2VyIiwiaWF0IjoxNzUzMTc0NjE4LCJleHAiOjE3NTMxODU0MTh9.Catg0o4qxVwkE_A_CINDeVBREoa5-VncbTS5teKzEa0
+
+{
+  "title": "重新测试",
+  "name":"杜博妍",
+  "description": "好烦好烦,不想测试！！！"
+}
+
+### 生成问题（暂时用的模拟数据）
+POST http://localhost:3001/api/quizzes/generate/1
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsInJvbGUiOiJzcGVha2VyIiwiaWF0IjoxNzUyOTE1NzMxLCJleHAiOjE3NTI5MjY1MzF9.ttSKXnzhf1YlKdFD9qpI7enmH_QLl9LSOUZ20yPq48k
+
+//file=@./text.txt;type=text/plain
+
+### 获取问题列表
+GET http://localhost:3001/api/quizzes/1
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsInJvbGUiOiJzcGVha2VyIiwiaWF0IjoxNzUyOTE1NzMxLCJleHAiOjE3NTI5MjY1MzF9.ttSKXnzhf1YlKdFD9qpI7enmH_QLl9LSOUZ20yPq48k
+
+### 提交答题结果
+POST http://localhost:3001/api/quizzes/answer
+Content-Type: application/json
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInJvbGUiOiJsaXN0ZW5lciIsImlhdCI6MTc1MjY2MTk3NCwiZXhwIjoxNzUyNjcyNzc0fQ.jji8jTR9RjT0zHQgQIiwUChtTA5tCD7MxBA_8DN-qUg
+
+{
+  "quizId": 1,
+  "selectedOption": "C"
+}
+
+
+### 上传讲座文件（文本或 PPT/PDF）
+POST http://localhost:3001/api/upload/1
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsInJvbGUiOiJzcGVha2VyIiwiaWF0IjoxNzUzMDE0NzU3LCJleHAiOjE3NTMwMjU1NTd9.pRxSFpb3cvnxqjt_eAVg3IpvuSkAtTz0hekwWrZ0sVc
+
+file=@"E:\project-1\popquiz-app\backend\passage.txt"
+
+### 生成题目
+POST http://localhost:3001/api/quizzes/generate/2
+Content-Type: application/json
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsInJvbGUiOiJzcGVha2VyIiwiaWF0IjoxNzUzMDIxODUzLCJleHAiOjE3NTMwMzI2NTN9.tXroEVu4ESTaD7JLLiVBcyh0-jwEbzZKbWg95G7HKhw
+
+{
+  "fileId": 1
+}
+
+
