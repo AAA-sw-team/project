@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const authMiddleware = require('../middleware/authMiddleware');
-const handleUpload = require('../controllers/uploadController');
+const  handleUpload  = require('../controllers/uploadcontroller');
 
 // 设置文件上传路径和命名
 const storage = multer.diskStorage({

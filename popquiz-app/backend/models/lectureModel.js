@@ -20,7 +20,7 @@ async function getAllLectures_db() {
  * 获取某用户的讲座
  */
 async function getLecturesByUser_db(userId) {
-  const sql = 'SELECT id, title, description, name, created_at FROM lectures WHERE speaker_id = ? ORDER BY created_at DESC';
+  const sql = 'SELECT id, title, description, name, status, created_at FROM lectures WHERE speaker_id = ? ORDER BY created_at DESC';
   return pool.promise().query(sql, [userId]);
 }
 // 删除讲座

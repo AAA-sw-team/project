@@ -33,7 +33,10 @@ async function getFilesByUserId(userId) {
 
 // 获取某讲座的所有文件
 async function getFilesByLectureId(lectureId) {
-  const [rows] = await pool.promise().query('SELECT id, filename, uploaded_at FROM files WHERE lecture_id = ? ORDER BY created_at DESC', [lectureId]);
+  const [rows] = await pool.promise().query(
+    'SELECT id, filename, filename as original_name, uploaded_at, uploaded_at as created_at FROM files WHERE lecture_id = ? ORDER BY uploaded_at DESC', 
+    [lectureId]
+  );
   return rows;
 }
 
