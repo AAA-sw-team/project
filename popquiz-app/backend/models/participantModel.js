@@ -56,14 +56,19 @@ async function getLectureParticipants(lectureId) {
 }
 
 /**
- * 获取用户参与的所有讲座（只返回进行中的）
+ * 获取用户参与的所有讲座（所有状态）
  */
 async function getUserJoinedLectures(userId) {
   const sql = `
-    SELECT lp.*, l.title, l.description, l.name as speaker_name, l.created_at as lecture_created_at, l.status
+    SELECT lp.lecture_id, lp.user_id, lp.joined_at, lp.left_at, 
+           lp.status as participant_status,
+           l.title, l.description, l.created_at as lecture_created_at, 
+           l.status as lecture_status,
+           u.nickname as speaker_name
     FROM lecture_participants lp
     JOIN lectures l ON lp.lecture_id = l.id
-    WHERE lp.user_id = ? AND lp.status = 'joined' AND l.status = 0
+    JOIN users u ON l.speaker_id = u.id
+    WHERE lp.user_id = ?
     ORDER BY lp.joined_at DESC
   `;
   const [rows] = await pool.promise().query(sql, [userId]);

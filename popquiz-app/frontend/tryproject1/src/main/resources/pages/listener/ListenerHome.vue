@@ -42,6 +42,10 @@
                 </div>
                 <div class="action-buttons-header">
                   <div class="lecture-id">ID: {{ lecture.id }}</div>
+                  <!-- 只有当用户已退出讲座（left状态）且讲座未结束时，才显示重新进入图标 -->
+                  <div v-if="lecture.participant_status === 'left' && lecture.status !== 2" class="reenter-icon" title="重新进入讲座" @click.stop="enterLecture(lecture)">
+                    🔄
+                  </div>
                 </div>
               </div>
               
@@ -120,7 +124,7 @@ const lectureId = ref('')
 const isJoining = ref(false)
 const showLectures = ref(false)
 const showCreate = ref(false)
-const myLectures = ref<{id: number, title: string, desc: string, speaker: string, status: number}[]>([])
+const myLectures = ref<{id: number, title: string, desc: string, speaker: string, status: number, participant_status: string}[]>([])
 const message = ref({
   show: false,
   type: 'success' as 'success' | 'error',
@@ -269,7 +273,42 @@ const fetchMyLectures = async () => {
 }
 
 // 进入讲座
-const enterLecture = (lecture: any) => {
+const enterLecture = async (lecture: any) => {
+  // 如果用户已退出讲座，需要先重新加入
+  if (lecture.participant_status === 'left') {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        showMessage('请先登录', 'error')
+        router.push('/login')
+        return
+      }
+
+      const joinResponse = await fetch(`/api/participants/join/${lecture.id}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!joinResponse.ok) {
+        const errorData = await joinResponse.json()
+        showMessage(errorData.message || '重新加入讲座失败', 'error')
+        return
+      }
+
+      showMessage('成功重新加入讲座！', 'success')
+      // 更新本地状态
+      lecture.participant_status = 'joined'
+    } catch (error) {
+      console.error('重新加入讲座错误:', error)
+      showMessage('网络错误，请稍后重试', 'error')
+      return
+    }
+  }
+
+  // 根据讲座状态跳转
   if (lecture.status === 1) {
     // 讲座进行中，跳转到答题页面
     router.push(`/listener/lecture/${lecture.id}/quiz`)
@@ -603,6 +642,38 @@ onMounted(() => {
   font-size: 0.8rem;
   color: #047857;
   font-weight: 600;
+}
+
+.reenter-icon {
+  font-size: 1.2rem;
+  color: #10a37f;
+  background: rgba(16, 163, 127, 0.1);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  animation: pulse 2s infinite;
+}
+
+.reenter-icon:hover {
+  background: rgba(16, 163, 127, 0.2);
+  transform: scale(1.1);
+  animation: none;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
 }
 
 .card-content {
@@ -964,6 +1035,12 @@ onMounted(() => {
   
   .action-buttons-header {
     gap: 0.3rem;
+  }
+  
+  .reenter-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 1rem;
   }
 }
 </style>

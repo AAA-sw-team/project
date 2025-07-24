@@ -47,7 +47,20 @@
           <h3 class="section-title">发表观点</h3>
         </div>
         
-        <form class="comment-form" @submit.prevent="submitComment">
+        <!-- 讲座已结束提示 -->
+        <div v-if="isLectureEnded" class="lecture-ended-notice">
+          <div class="notice-icon">⏰</div>
+          <p>讲座已结束，无法发布新的讨论内容</p>
+        </div>
+        
+        <!-- 讲座未开始提示 -->
+        <div v-else-if="isLectureUpcoming" class="lecture-upcoming-notice">
+          <div class="notice-icon">⏳</div>
+          <p>讲座尚未开始，请等待讲座开始后再参与讨论</p>
+        </div>
+        
+        <!-- 正常评论表单 -->
+        <form v-else class="comment-form" @submit.prevent="submitComment">
           <div class="form-group">
             <label class="form-label">💭 您的观点</label>
             <textarea 
@@ -71,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
@@ -79,6 +92,41 @@ const lectureId = route.params.id
 
 const loading = ref(true)
 const speakerName = '演讲者本人'
+
+// 获取当前讲座信息
+const getCurrentLecture = () => {
+  const currentLectureId = localStorage.getItem('currentLectureId')
+  if (currentLectureId && currentLectureId === lectureId) {
+    // 模拟讲座数据，实际应该从API获取
+    return {
+      id: lectureId,
+      title: 'AI与机器学习前沿技术',
+      speaker: '张教授',
+      startTime: new Date(2024, 11, 25, 14, 0),
+      endTime: new Date(2024, 11, 25, 16, 0),
+      status: 'active'
+    }
+  }
+  return null
+}
+
+// 检查讲座状态
+const checkLectureStatus = () => {
+  const lecture = getCurrentLecture()
+  if (!lecture) return { ended: false, upcoming: false, active: false }
+  
+  const now = new Date()
+  return {
+    ended: now > lecture.endTime,
+    upcoming: now < lecture.startTime,
+    active: now >= lecture.startTime && now <= lecture.endTime
+  }
+}
+
+const lectureStatus = computed(() => checkLectureStatus())
+const isLectureEnded = computed(() => lectureStatus.value.ended)
+const isLectureUpcoming = computed(() => lectureStatus.value.upcoming)
+const isLectureActive = computed(() => lectureStatus.value.active)
 
 // 只显示当前讲座的评论数据
 const comments = ref([
@@ -483,6 +531,33 @@ onMounted(() => {
   animation: slideInRight 0.5s ease-out;
 }
 
+/* 讲座状态提示样式 */
+.lecture-ended-notice,
+.lecture-upcoming-notice {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 16px;
+  padding: 2rem;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  margin: 1rem 0;
+}
+
+.notice-icon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.lecture-ended-notice p,
+.lecture-upcoming-notice p {
+  font-size: 1rem;
+  color: #6b7280;
+  margin: 0;
+  font-weight: 500;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .discussion-wrapper {
@@ -511,6 +586,15 @@ onMounted(() => {
   .submit-btn {
     width: 100%;
     justify-content: center;
+  }
+  
+  .lecture-ended-notice,
+  .lecture-upcoming-notice {
+    padding: 1.5rem 1rem;
+  }
+  
+  .notice-icon {
+    font-size: 2rem;
   }
 }
 </style>
