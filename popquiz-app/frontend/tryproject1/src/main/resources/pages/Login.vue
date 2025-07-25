@@ -262,6 +262,18 @@ const handleLogin = async () => {
       localStorage.setItem('username', username.value)
       localStorage.setItem('nickname', res.data.nickname || username.value)
       
+      // 新增：登录后获取当前用户信息并存入localStorage
+      try {
+        const userRes = await axios.get('/api/users/me', {
+          headers: { Authorization: `Bearer ${res.data.token}` }
+        })
+        if (userRes.data && userRes.data.id) {
+          localStorage.setItem('user', JSON.stringify(userRes.data))
+        }
+      } catch (e) {
+        console.error('获取当前用户信息失败', e)
+      }
+      
       const roleText = role.value === 'listener' ? '听众' : 
                       role.value === 'speaker' ? '演讲者' : '组织者'
       successMessage.value = `欢迎回来，${res.data.nickname || username.value}！正在跳转到${roleText}页面...`

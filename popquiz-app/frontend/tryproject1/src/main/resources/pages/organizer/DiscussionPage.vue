@@ -175,7 +175,10 @@ async function fetchComments() {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (res.data && res.data.success && res.data.data && res.data.data.messages) {
-      comments.value = res.data.data.messages
+      comments.value = res.data.data.messages.map(item => ({
+        ...item,
+        user_id: item.user_id // 保证user_id字段存在
+      }))
     } else {
       comments.value = []
     }
@@ -183,9 +186,13 @@ async function fetchComments() {
     comments.value = []
   }
   loading.value = false
+  user.value = JSON.parse(localStorage.getItem('user') || '{}')
 }
 
-onMounted(fetchComments)
+onMounted(() => {
+  user.value = JSON.parse(localStorage.getItem('user') || '{}')
+  fetchComments()
+})
 
 // 发布评论
 async function addComment() {
