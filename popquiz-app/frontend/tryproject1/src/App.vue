@@ -29,7 +29,7 @@
                 <div class="lecture-details">
                   <div class="lecture-item">
                     <span class="item-icon">👤</span>
-                    <span class="item-label">讲者：</span>
+                    <span class="item-label">讲师：</span>
                     <span class="item-value">{{ getCurrentLecture().speaker || '无' }}</span>
                   </div>
                   <div class="lecture-item">
@@ -79,7 +79,7 @@
           </div>
           <div class="user-info" v-if="getUserRole()">
             <span class="user-role-badge" :class="getUserRole()">
-              {{ getUserRole() === 'speaker' ? '📢 讲者' : '👥 听众' }}
+              {{ getUserRole() === 'speaker' ? '📢 讲师' : getUserRole() === 'listener' ? '�� 听众' : '🛠 组织者' }}
             </span>
           </div>
         </nav>
@@ -339,7 +339,10 @@ const getUserRole = () => {
 // 首页按钮点击处理
 const handleHomeClick = async () => {
   const userRole = getUserRole()
-  
+  if (userRole === 'organizer') {
+    router.push('/organizer')
+    return
+  }
   if (userRole === 'speaker') {
     // 检查是否在讲座中
     if (route.path.includes('/lecture/')) {
@@ -554,7 +557,7 @@ const exitCurrentLecture = async () => {
     }
     
     // 根据用户角色显示不同的提示
-    const roleText = userRole === 'speaker' ? '讲者' : '听众'
+    const roleText = userRole === 'speaker' ? '讲师' : '听众'
     const message = userRole === 'listener' && !isLectureEnded(currentLecture) 
       ? `${roleText}已退出讲座"${currentLecture.title}"，您可以随时重新进入未结束的讲座`
       : `${roleText}已成功退出讲座"${currentLecture.title}"`
@@ -589,7 +592,7 @@ const exitCurrentLecture = async () => {
         localStorage.removeItem('currentLecture')
       }
       
-      const roleText = userRole === 'speaker' ? '讲者' : '听众'
+      const roleText = userRole === 'speaker' ? '讲师' : '听众'
       alert(`${roleText}已在本地退出讲座，但服务器状态可能未同步`)
     } else {
       // 重新抛出错误，让调用者知道失败了
@@ -951,6 +954,12 @@ function formatLectureTimePanel(lecture) {
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(62, 175, 124, 0.1) 100%);
   color: #667eea;
   border-color: rgba(102, 126, 234, 0.3);
+}
+
+.user-role-badge.organizer {
+  background: linear-gradient(135deg, #ff9800 0%, #ffb74d 100%);
+  color: #fff;
+  border-color: #ff9800;
 }
 
 .user-role-badge:hover {
