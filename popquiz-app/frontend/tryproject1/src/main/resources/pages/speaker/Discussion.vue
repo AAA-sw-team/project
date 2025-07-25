@@ -12,6 +12,13 @@
     </div>
     
     <div v-else class="content-section">
+      <!-- 讲师可发公告 -->
+      <div v-if="userRole === 'organizer' || userRole === 'speaker'" class="announcement-section">
+        <form @submit.prevent="sendAnnouncement" class="announcement-form">
+          <input v-model="announcementText" placeholder="发布公告（自动置顶）" class="announcement-input" />
+          <button type="submit" class="announcement-btn" :disabled="!announcementText.trim()">发布公告</button>
+        </form>
+      </div>
       <!-- 讨论列表 -->
       <div class="comments-section animate-slide-up">
         <div class="section-header">
@@ -26,16 +33,27 @@
         </div>
         
         <div v-else class="comments-list">
-          <div v-for="comment in comments" :key="comment.id" class="comment-card animate-slide-in">
+          <div v-for="comment in comments" :key="comment.id" class="comment-card animate-slide-in" :class="{ pinned: comment.isPinned }">
             <div class="comment-header">
               <div class="user-info">
                 <span class="user-avatar">👤</span>
                 <span class="user-name">{{ comment.userName }}</span>
                 <span class="user-badge" v-if="comment.userName === speakerName">演讲者</span>
+                <span class="pinned-badge" v-if="comment.isPinned">📌置顶</span>
               </div>
               <span class="comment-time">{{ formatTime(comment.time) }}</span>
             </div>
             <div class="comment-body">{{ comment.text }}</div>
+            <div class="comment-actions">
+              <button @click="toggleLike(comment)" :class="{ liked: comment.isLikedByUser }" class="like-btn">
+                👍 {{ comment.likeCount }}
+              </button>
+              <button v-if="(userRole === 'organizer' || userRole === 'speaker')" @click="togglePin(comment)" class="pin-btn">
+                {{ comment.isPinned ? '取消置顶' : '置顶' }}
+              </button>
+              <button v-if="userRole === 'speaker'" @click="deleteComment(comment)" class="delete-btn">删除</button>
+              <button v-else-if="comment.userId === userId || userRole === 'organizer'" @click="deleteComment(comment)" class="delete-btn">删除</button>
+            </div>
           </div>
         </div>
       </div>
@@ -73,48 +91,123 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import axios from 'axios'
 
 const route = useRoute()
 const lectureId = route.params.id
 
+const comments = ref([])
 const loading = ref(true)
 const speakerName = '演讲者本人'
+const userId = ref(null)
+const userRole = ref('')
 
-// 只显示当前讲座的评论数据
-const comments = ref([
-  { 
-    id: 1, 
-    userName: '张同学', 
-    text: '这个讲座内容很有深度，特别是关于AI技术发展趋势的分析！', 
-    time: new Date(Date.now() - 300000) 
-  },
-  { 
-    id: 2, 
-    userName: '李老师', 
-    text: '演讲者的观点很独特，对我的研究很有启发。', 
-    time: new Date(Date.now() - 180000) 
-  },
-  { 
-    id: 3, 
-    userName: '王学生', 
-    text: '希望能多分享一些实际应用案例，谢谢！', 
-    time: new Date(Date.now() - 120000) 
+// 获取评论列表
+const fetchComments = async () => {
+  loading.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const res = await axios.get(`/api/discussion/lecture/${lectureId}/messages`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (res.data && res.data.success && res.data.data && res.data.data.messages) {
+      comments.value = res.data.data.messages.map(item => ({
+        id: item.id,
+        userName: item.username,
+        text: item.message,
+        time: new Date(item.created_at),
+        likeCount: item.like_count,
+        isLikedByUser: item.isLikedByUser,
+        isPinned: item.is_pinned,
+        userId: item.user_id,
+        userRole: item.user_role
+      }))
+    } else {
+      comments.value = []
+    }
+  } catch (e) {
+    comments.value = []
   }
-])
+  loading.value = false
+}
 
 const newComment = ref({ text: '' })
 
-const submitComment = () => {
+const submitComment = async () => {
   if (!newComment.value.text.trim()) return
-  
-  comments.value.push({
-    id: Date.now(),
-    userName: speakerName,
-    text: newComment.value.text,
-    time: new Date()
-  })
-  
-  newComment.value.text = ''
+  try {
+    const token = localStorage.getItem('token')
+    const res = await axios.post(`/api/discussion/lecture/${lectureId}/message`, {
+      message: newComment.value.text
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (res.data && res.data.success) {
+      // 重新拉取评论列表，或可直接push新评论
+      await fetchComments()
+      newComment.value.text = ''
+    }
+  } catch (e) {
+    // 可加错误提示
+  }
+}
+
+// 点赞/取消点赞
+const toggleLike = async (comment) => {
+  try {
+    const token = localStorage.getItem('token')
+    const res = await axios.post(`/api/discussion/message/${comment.id}/like`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (res.data && res.data.success) {
+      await fetchComments()
+    }
+  } catch (e) {}
+}
+
+// 置顶/取消置顶（仅讲师）
+const togglePin = async (comment) => {
+  try {
+    const token = localStorage.getItem('token')
+    const res = await axios.post(`/api/discussion/lecture/${lectureId}/message/${comment.id}/pin`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (res.data && res.data.success) {
+      await fetchComments()
+    }
+  } catch (e) {}
+}
+
+// 删除消息（本人或讲师）
+const deleteComment = async (comment) => {
+  if (!confirm('确定要删除这条消息吗？')) return
+  try {
+    const token = localStorage.getItem('token')
+    const res = await axios.delete(`/api/discussion/lecture/${lectureId}/message/${comment.id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (res.data && res.data.success) {
+      await fetchComments()
+    }
+  } catch (e) {}
+}
+
+// 发送公告（仅讲师）
+const announcementText = ref('')
+const sendAnnouncement = async () => {
+  if (!announcementText.value.trim()) return
+  try {
+    const token = localStorage.getItem('token')
+    const res = await axios.post(`/api/discussion/lecture/${lectureId}/announcement`, {
+      message: announcementText.value
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (res.data && res.data.success) {
+      announcementText.value = ''
+      await fetchComments()
+    }
+  } catch (e) {}
 }
 
 const formatTime = (time: Date) => {
@@ -130,9 +223,11 @@ const formatTime = (time: Date) => {
 }
 
 onMounted(() => {
-  setTimeout(() => { 
-    loading.value = false 
-  }, 400)
+  // 获取用户信息（假设token中有，或从后端接口获取）
+  const userInfo = JSON.parse(localStorage.getItem('user') || '{}')
+  userId.value = userInfo.userId
+  userRole.value = userInfo.role
+  fetchComments()
 })
 </script>
 
@@ -235,6 +330,65 @@ onMounted(() => {
   margin: 0;
 }
 
+/* 公告区域 */
+.announcement-section {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid rgba(16, 163, 127, 0.1);
+  margin-bottom: 2rem;
+}
+
+.announcement-form {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.announcement-input {
+  flex-grow: 1;
+  padding: 0.8rem;
+  border: 2px solid rgba(16, 163, 127, 0.2);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.announcement-input:focus {
+  outline: none;
+  border-color: #10a37f;
+  box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1);
+}
+
+.announcement-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.5rem;
+  background: linear-gradient(135deg, #10a37f 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(16, 163, 127, 0.2);
+}
+
+.announcement-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0e8c6b 0%, #047857 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 163, 127, 0.3);
+}
+
+.announcement-btn:disabled {
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 /* 评论区域 */
 .comments-section {
   background: rgba(255, 255, 255, 0.7);
@@ -286,6 +440,21 @@ onMounted(() => {
   box-shadow: 0 4px 16px rgba(16, 163, 127, 0.12);
 }
 
+.comment-card.pinned {
+  border-left: 4px solid #10a37f;
+  padding-left: 0.8rem;
+}
+
+.pinned-badge {
+  background: linear-gradient(135deg, #10a37f 0%, #059669 100%);
+  color: white;
+  padding: 0.1rem 0.5rem;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
 .comment-header {
   display: flex;
   justify-content: space-between;
@@ -327,6 +496,66 @@ onMounted(() => {
   color: #374151;
   line-height: 1.6;
   font-size: 0.95rem;
+  margin-bottom: 0.8rem;
+}
+
+.comment-actions {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: flex-end;
+}
+
+.like-btn, .pin-btn, .delete-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.like-btn {
+  background: linear-gradient(135deg, #e0f2fe 0%, #d1eefd 100%);
+  color: #10a37f;
+  border: 1px solid #10a37f;
+}
+
+.like-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #cce6ff 0%, #b8e0ff 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(16, 163, 127, 0.1);
+}
+
+.like-btn.liked {
+  background: linear-gradient(135deg, #10a37f 0%, #059669 100%);
+  color: white;
+  border: none;
+}
+
+.pin-btn {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  color: #d97706;
+  border: 1px solid #d97706;
+}
+
+.pin-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #fef9c3 0%, #fde68a 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.1);
+}
+
+.delete-btn {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #991b1b;
+  border: 1px solid #991b1b;
+}
+
+.delete-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(153, 27, 27, 0.1);
 }
 
 /* 评论表单区域 */
@@ -509,6 +738,20 @@ onMounted(() => {
   }
   
   .submit-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .announcement-form {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .announcement-input {
+    width: 100%;
+  }
+
+  .announcement-btn {
     width: 100%;
     justify-content: center;
   }

@@ -95,7 +95,7 @@ async function isLectureCreator(lectureId, userId) {
   const sql = `
     SELECT COUNT(*) as count 
     FROM lectures 
-    WHERE id = ? AND user_id = ?
+    WHERE id = ? AND speaker_id = ?
   `;
   const [rows] = await pool.promise().query(sql, [lectureId, userId]);
   return rows[0].count > 0;
