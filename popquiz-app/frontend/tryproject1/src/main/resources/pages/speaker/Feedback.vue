@@ -195,9 +195,14 @@ const fetchStats = async () => {
       const positive = statArr.find(s => s.feedback_type === 'good')?.count || 0
       const average = total > 0 ? parseFloat((positive * 5 / total).toFixed(1)) : 0
       stats.value = { total, positive, average }
+      // 修复：赋值类型统计数据
+      typeStats.value = statArr
+      totalCount.value = total
       console.log('处理后的统计数据:', stats.value)
     } else {
       stats.value = { total: 0, positive: 0, average: 0 }
+      typeStats.value = []
+      totalCount.value = 0
       console.log('未获取到统计数据或格式不正确')
     }
   } catch (e) {

@@ -146,19 +146,19 @@ class DiscussionController {
             const userId = req.user.userId;
             const userRole = req.user.role;
 
-
             console.log('获取讨论消息 - 讲座ID:', lectureId, '用户ID:', userId, '页码:', page, '限制:', limit);
 
             // 检查访问权限
-            const canAccess = await DiscussionModel.canSendMessage(lectureId, userId);
-            console.log('用户发言权限检查结果:', canAccess);
-            
-            if ((!canAccess.can||SenduserRole !== 'organizer') && !await ParticipantModel.isLectureCreator(lectureId, userId)) {
-                console.log('用户无权限查看讨论');
-                return res.status(403).json({
-                    success: false,
-                    message: '没有权限查看讨论'
-                });
+            if (userRole !== 'organizer') {
+                const canAccess = await DiscussionModel.canSendMessage(lectureId, userId);
+                console.log('用户发言权限检查结果:', canAccess);
+                if (!canAccess.canSend && !await ParticipantModel.isLectureCreator(lectureId, userId)) {
+                    console.log('用户无权限查看讨论');
+                    return res.status(403).json({
+                        success: false,
+                        message: '没有权限查看讨论'
+                    });
+                }
             }
 
             const result = await DiscussionModel.getAllDiscussionMessages(
