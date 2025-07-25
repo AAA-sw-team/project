@@ -12,13 +12,47 @@
     </div>
     
     <div v-else class="content-section">
-      <!-- 反馈统计 -->
-      <div class="stats-section animate-slide-up">
+      <div class="feedback-btn-group">
+        <button :class="{active: showSections.typeStats}" @click="showSections.typeStats=!showSections.typeStats">反馈类型统计</button>
+        <button :class="{active: showSections.stats}" @click="showSections.stats=!showSections.stats">反馈统计</button>
+        <button :class="{active: showSections.details}" @click="showSections.details=!showSections.details">详细反馈</button>
+      </div>
+      <div v-if="showSections.typeStats" class="feedback-stats-section animate-slide-up">
+        <!-- 反馈类型统计表格内容（原 typeStats 区块） -->
         <div class="section-header">
           <div class="section-icon">📈</div>
-          <h3 class="section-title">反馈统计</h3>
+          <h3 class="section-title">反馈类型统计</h3>
         </div>
-        
+        <div v-if="typeStats.length === 0" class="empty-state">
+          <div class="empty-icon">📊</div>
+          <h4>暂无反馈统计</h4>
+          <p>暂无数据</p>
+        </div>
+        <div v-else class="stats-chart">
+          <table class="stats-table">
+            <thead>
+              <tr>
+                <th>类型</th>
+                <th>数量</th>
+                <th>占比</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in typeStats" :key="item.feedback_type">
+                <td>{{ item.feedbackTypeText || item.feedback_type }}</td>
+                <td>{{ item.count }}</td>
+                <td>{{ item.percentage ? item.percentage + '%' : ((item.count / (totalCount || 1) * 100).toFixed(2) + '%') }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div v-if="showSections.stats" class="stats-section animate-slide-up">
+        <!-- 原 stats-section 区块内容 -->
+        <div class="section-header">
+          <div class="section-icon">📈</div>
+          <h3 class="section-title">数量和评分统计</h3>
+        </div>
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-number">{{ stats.total }}</div>
@@ -34,20 +68,17 @@
           </div>
         </div>
       </div>
-      
-      <!-- 反馈列表 -->
-      <div class="feedbacks-section animate-slide-up-delay">
+      <div v-if="showSections.details" class="feedbacks-section animate-slide-up-delay">
+        <!-- 原 feedbacks-section 区块内容 -->
         <div class="section-header">
           <div class="section-icon">💬</div>
           <h3 class="section-title">详细反馈</h3>
         </div>
-        
         <div v-if="feedbacks.length === 0" class="empty-state">
           <div class="empty-icon">📝</div>
           <h4>暂无反馈内容</h4>
           <p>听众的反馈将在这里显示</p>
         </div>
-        
         <div v-else class="feedback-list">
           <div v-for="feedback in feedbacks" :key="feedback.id" class="feedback-card animate-slide-in">
             <div class="feedback-header">
@@ -89,6 +120,9 @@ const lectureId = route.params.id
 const feedbacks = ref([])
 const stats = ref({ total: 0, positive: 0, average: 0 })
 const loading = ref(true)
+const typeStats = ref<any[]>([])
+const totalCount = ref(0)
+const showSections = ref<{[key:string]: boolean}>({ typeStats: false, stats: false, details: false })
 
 const fetchFeedbacks = async () => {
   loading.value = true
@@ -129,11 +163,17 @@ const fetchStats = async () => {
       const positive = statArr.find(s => s.feedback_type === 'good')?.count || 0
       const average = total > 0 ? (positive * 5 / total).toFixed(1) : '0.0'
       stats.value = { total, positive, average }
+      typeStats.value = statArr
+      totalCount.value = total
     } else {
       stats.value = { total: 0, positive: 0, average: 0 }
+      typeStats.value = []
+      totalCount.value = 0
     }
   } catch (e) {
     stats.value = { total: 0, positive: 0, average: 0 }
+    typeStats.value = []
+    totalCount.value = 0
   }
 }
 
@@ -466,6 +506,38 @@ onMounted(() => {
   border: 1px solid rgba(16, 163, 127, 0.2);
 }
 
+.feedback-stats-section {
+  background: rgba(255,255,255,0.8);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid rgba(16, 163, 127, 0.1);
+  margin-bottom: 2rem;
+}
+.stats-chart {
+  margin-top: 1rem;
+}
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(16,163,127,0.07);
+}
+.stats-table th, .stats-table td {
+  padding: 10px 8px;
+  text-align: center;
+  border-bottom: 1px solid #e0e0e0;
+}
+.stats-table th {
+  background: #f0fdf4;
+  color: #059669;
+  font-weight: 700;
+}
+.stats-table tr:last-child td {
+  border-bottom: none;
+}
+
 /* 动画效果 */
 @keyframes spin {
   0% { transform: rotate(0deg); }
@@ -577,5 +649,27 @@ onMounted(() => {
   .user-info {
     flex-wrap: wrap;
   }
+}
+.feedback-btn-group {
+  display: flex;
+  gap: 1.2rem;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+.feedback-btn-group button {
+  background: #f0fdf4;
+  color: #059669;
+  border: 1.5px solid #10a37f;
+  border-radius: 8px;
+  padding: 0.6rem 1.6rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s, border 0.18s;
+}
+.feedback-btn-group button.active, .feedback-btn-group button:hover {
+  background: linear-gradient(135deg, #10a37f 0%, #059669 100%);
+  color: #fff;
+  border: 1.5px solid #059669;
 }
 </style> 

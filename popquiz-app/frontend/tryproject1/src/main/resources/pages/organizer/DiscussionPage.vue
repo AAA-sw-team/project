@@ -65,6 +65,9 @@
                   <span class="user-name">{{ reply.username }}</span>
                   <span class="user-role-badge" :class="'role-' + reply.user_role">{{ getRoleText(reply.user_role) }}</span>
                   <span class="comment-time">{{ formatTime(reply.created_at) }}</span>
+                  <button class="like-btn" :class="{ liked: reply.isLikedByUser }" @click="toggleLike(reply)" :title="reply.isLikedByUser ? '取消点赞' : '点赞'">
+                    👍 {{ reply.like_count }}
+                  </button>
                   <button v-if="canDelete(reply)" class="delete-btn" @click="confirmDelete(reply)" title="删除">删除</button>
                 </div>
                 <div class="reply-body">{{ reply.message }}</div>

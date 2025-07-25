@@ -8,8 +8,8 @@
           <p class="subtitle">查看讲座及其用户管理入口</p>
         </div>
         <div class="top-btn-group">
-          <button :class="['big-switch-btn', {active: showType==='lectures'}]" @click="showType='lectures'">全部讲座</button>
-          <button :class="['big-switch-btn', {active: showType==='users'}]" @click="showType='users'">全部用户</button>
+          <button :class="['big-switch-btn', 'btn-lectures', {active: showType==='lectures'}]" @click="showType='lectures'">全部讲座</button>
+          <button :class="['big-switch-btn', 'btn-users', {active: showType==='users'}]" @click="showType='users'">全部用户</button>
         </div>
         <div v-if="showType==='lectures'" class="lecture-list">
           <div class="list-header">
@@ -36,9 +36,9 @@
                 </div>
               </div>
               <div class="card-footer">
-                <button class="manage-btn" @click="goToPage(lecture.id, 'discussion')">讨论区</button>
-                <button class="manage-btn" @click="goToPage(lecture.id, 'feedback')">反馈</button>
-                <button class="manage-btn" @click="goToPage(lecture.id, 'score')">成绩总览</button>
+                <button class="manage-btn btn-discussion" @click="goToPage(lecture.id, 'discussion')">讨论区</button>
+                <button class="manage-btn btn-feedback" @click="goToPage(lecture.id, 'feedback')">反馈</button>
+                <button class="manage-btn btn-score" @click="goToPage(lecture.id, 'score')">成绩总览</button>
               </div>
             </div>
           </div>
@@ -754,6 +754,41 @@ function getStatusClass(status) {
 }
 .role-badge.listener {
   background: linear-gradient(135deg, #43a047 0%, #66bb6a 100%);
+}
+.big-switch-btn.btn-lectures {
+  background: linear-gradient(135deg, #10a37f 0%, #43e97b 100%);
+  color: #fff;
+}
+.big-switch-btn.btn-users {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  color: #fff;
+}
+.big-switch-btn.btn-lectures.active, .big-switch-btn.btn-lectures:hover {
+  background: linear-gradient(135deg, #43e97b 0%, #10a37f 100%);
+}
+.big-switch-btn.btn-users.active, .big-switch-btn.btn-users:hover {
+  background: linear-gradient(135deg, #38f9d7 0%, #43e97b 100%);
+}
+.manage-btn.btn-discussion {
+  background: linear-gradient(135deg, #10a37f 0%, #43e97b 100%);
+  color: #fff;
+}
+.manage-btn.btn-feedback {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  color: #fff;
+}
+.manage-btn.btn-score {
+  background: linear-gradient(135deg, #059669 0%, #a8ff78 100%);
+  color: #fff;
+}
+.manage-btn.btn-discussion:hover {
+  background: linear-gradient(135deg, #43e97b 0%, #10a37f 100%);
+}
+.manage-btn.btn-feedback:hover {
+  background: linear-gradient(135deg, #38f9d7 0%, #43e97b 100%);
+}
+.manage-btn.btn-score:hover {
+  background: linear-gradient(135deg, #a8ff78 0%, #059669 100%);
 }
 @media (max-width: 768px) {
   .organizer-home-bg {

@@ -79,7 +79,7 @@
           </div>
           <div class="user-info" v-if="getUserRole()">
             <span class="user-role-badge" :class="getUserRole()">
-              {{ getUserRole() === 'speaker' ? '📢 讲师' : getUserRole() === 'listener' ? '�� 听众' : '🛠 组织者' }}
+              {{ getUserRole() === 'speaker' ? '📢 讲师' : getUserRole() === 'listener' ? '👤 听众' : '🛠 组织者' }}
             </span>
           </div>
         </nav>
