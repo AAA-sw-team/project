@@ -1,12 +1,12 @@
 const db = require('../models/db');
 
-// »ñÈ¡ËùÓĞÓÃ»§
+// è·å–æ‰€æœ‰ç”¨æˆ·
 exports.getAllUsers = (req, res) => {
     if (!req.user || req.user.role !== 'organizer') {
-        return res.status(403).json({ error: 'ÎŞÈ¨ÏŞ·ÃÎÊ' });
+        return res.status(403).json({ error: 'æ— æƒé™è®¿é—®' });
     }
     db.query('SELECT id, username, nickname, role, created_at FROM users ORDER BY created_at DESC', (err, results) => {
-        if (err) return res.status(500).json({ error: 'Êı¾İ¿â´íÎó' });
+        if (err) return res.status(500).json({ error: 'æ•°æ®åº“é”™è¯¯' });
         res.json(results);
     });
 }; 

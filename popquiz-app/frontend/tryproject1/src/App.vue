@@ -168,7 +168,7 @@ const toggleLectureInfo = async () => {
           participantCount = data.participant_count !== undefined ? data.participant_count : '无'
         }
       } catch {}
-      currentLecture.value = {
+      currentLectureData.value = {
         ...lecture,
         participants: participantCount,
         status: lecture.status // 确保最新状态
@@ -366,16 +366,10 @@ const handleHomeClick = async () => {
       // 标记这是通过首页按钮的合法导航
       sessionStorage.setItem('homeButtonClicked', 'true')
       router.push('/speaker/home')
-    } else if (userRole === 'listener') {
-      // 听众点击首页时，不退出讲座，直接导航到首页
-      router.push('/listener/home')
     }
-  } catch (error) {
-    console.error('首页导航过程中发生错误:', error)
-    // 即使发生错误，也尝试导航到相应的首页
-    const targetPath = userRole === 'speaker' ? '/speaker/home' : '/listener/home'
-    sessionStorage.setItem('homeButtonClicked', 'true')
-    router.push(targetPath)
+  } else if (userRole === 'listener') {
+    // 听众点击首页时，不退出讲座，直接导航到首页
+    router.push('/listener/home')
   }
 }
 
@@ -532,12 +526,6 @@ const getStatusText = (status) => {
   }
 }
 
-// 获取当前讲座信息
-const getCurrentLecture = () => {
-  return currentLecture.value
-}
-
-<
 // 监听路由变化，自动设置当前讲座
 const updateCurrentLecture = async () => {
 
@@ -548,12 +536,12 @@ const updateCurrentLecture = async () => {
   }
   if (lectureId) {
     const lecture = await fetchLectureById(lectureId)
-    currentLecture.value = lecture
+    currentLectureData.value = lecture
     if (lecture) {
       localStorage.setItem('currentLectureId', lectureId)
     }
   } else {
-    currentLecture.value = null
+    currentLectureData.value = null
   }
   // 异步加载讲座信息
   await loadCurrentLecture()
