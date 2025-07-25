@@ -6,12 +6,13 @@ const pool = require('./db');
 async function joinLecture(lectureId, userId) {
   // 使用 INSERT ... ON DUPLICATE KEY UPDATE 来处理重复加入的情况
   const sql = `
-    INSERT INTO lecture_participants (lecture_id, user_id, joined_at, status) 
-    VALUES (?, ?, NOW(), 'joined')
+    INSERT INTO lecture_participants (lecture_id, user_id, joined_at, status, last_seen) 
+    VALUES (?, ?, NOW(), 'joined', NOW())
     ON DUPLICATE KEY UPDATE 
       joined_at = NOW(), 
       left_at = NULL, 
-      status = 'joined'
+      status = 'joined',
+      last_seen = NOW()
   `;
   return pool.promise().query(sql, [lectureId, userId]);
 }
@@ -29,12 +30,24 @@ async function leaveLecture(lectureId, userId) {
 }
 
 /**
- * 检查用户是否已加入讲座
+ * 检查用户是否已加入讲座（当前状态为joined）
  */
 async function isUserInLecture(lectureId, userId) {
   const sql = `
     SELECT * FROM lecture_participants 
     WHERE lecture_id = ? AND user_id = ? AND status = 'joined'
+  `;
+  const [rows] = await pool.promise().query(sql, [lectureId, userId]);
+  return rows.length > 0;
+}
+
+/**
+ * 检查用户是否曾经加入过讲座（无论当前状态如何）
+ */
+async function hasUserEverJoined(lectureId, userId) {
+  const sql = `
+    SELECT * FROM lecture_participants 
+    WHERE lecture_id = ? AND user_id = ?
   `;
   const [rows] = await pool.promise().query(sql, [lectureId, userId]);
   return rows.length > 0;
@@ -105,6 +118,7 @@ module.exports = {
   joinLecture,
   leaveLecture,
   isUserInLecture,
+  hasUserEverJoined,
   getLectureParticipants,
   getUserJoinedLectures,
   getLectureParticipantCount,

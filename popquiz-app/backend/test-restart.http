@@ -1,8 +1,0 @@
-### 重新开始讲座测试
-POST http://localhost:3000/api/lectures/1/restart
-Authorization: Bearer YOUR_SPEAKER_TOKEN_HERE
-Content-Type: application/json
-
-### 获取讲座列表查看状态
-GET http://localhost:3000/api/lectures/my
-Authorization: Bearer YOUR_SPEAKER_TOKEN_HERE

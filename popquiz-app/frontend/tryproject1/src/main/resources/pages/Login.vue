@@ -252,16 +252,11 @@ const handleLogin = async () => {
     console.log('登录响应:', res.data)
     
     if (res.data.message === '登录成功' && res.data.token) {
-      // 登录成功
-      localStorage.setItem('token', res.data.token)
-      // 存储完整用户信息，便于后续页面统一获取
-      const userObj = {
-        userId: res.data.userId || res.data.id,
-        role: res.data.role || role.value,
-        username: res.data.username || username.value,
-        nickname: res.data.nickname || username.value
-      }
-      localStorage.setItem('user', JSON.stringify(userObj))
+      // 登录成功 - 使用sessionStorage存储token（关闭浏览器标签页后自动清除）
+      sessionStorage.setItem('token', res.data.token)
+      sessionStorage.setItem('userRole', res.data.role || role.value)
+      sessionStorage.setItem('username', username.value)
+      sessionStorage.setItem('nickname', res.data.nickname || username.value)
       
       const roleText = role.value === 'listener' ? '听众' : 
                       role.value === 'speaker' ? '演讲者' : '组织者'
