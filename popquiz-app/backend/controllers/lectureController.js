@@ -237,7 +237,7 @@ async function getLectureDetail(req, res) {
     }
     const lecture = lectureRows[0];
     // 获取讲座文件列表
-    const [fileRows] = await pool.promise().query('SELECT id, filename, filepath, filetype, uploaded_at FROM files WHERE lecture_id = ? ORDER BY created_at DESC', [lectureId]);
+    const [fileRows] = await pool.promise().query('SELECT id, filename, filepath, filetype, uploaded_at FROM files WHERE lecture_id = ? ORDER BY uploaded_at DESC', [lectureId]);
     // 获取讲座题目列表
     const [quizRows] = await pool.promise().query('SELECT id, question, option_a, option_b, option_c, option_d, correct_option, published, created_at FROM quizzes WHERE lecture_id = ? ORDER BY created_at DESC', [lectureId]);
     // 字段筛选

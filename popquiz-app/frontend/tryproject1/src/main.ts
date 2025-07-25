@@ -82,7 +82,8 @@ const router = createRouter({
 
 // 路由守卫 - 防止已登录用户访问登录页，未登录用户访问需要认证的页面
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('token')
+  // 使用sessionStorage代替localStorage，确保关闭浏览器标签页后自动清除登录状态
+  const token = sessionStorage.getItem('token')
   const isLoggedIn = !!token
   
   // 需要认证的路径
@@ -103,7 +104,8 @@ router.beforeEach((to, from, next) => {
         next('/login')
       }
     } catch (e) {
-      localStorage.removeItem('token')
+      // token无效，清除并重定向到登录页
+      sessionStorage.removeItem('token')
       next('/login')
     }
     return
@@ -124,7 +126,7 @@ router.beforeEach((to, from, next) => {
       }
     } catch (e) {
       // token无效，清除并重定向到登录页
-      localStorage.removeItem('token')
+      sessionStorage.removeItem('token')
       next('/login')
     }
   } 
@@ -157,7 +159,7 @@ router.beforeEach((to, from, next) => {
       }
     } catch (e) {
       // token无效，清除并重定向到登录页
-      localStorage.removeItem('token')
+      sessionStorage.removeItem('token')
       next('/login')
     }
   } else {

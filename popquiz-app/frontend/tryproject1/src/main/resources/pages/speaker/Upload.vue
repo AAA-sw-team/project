@@ -289,7 +289,7 @@ const hasSelectedFiles = computed(() => {
 })
 
 function getAuthHeader() {
-  const token = localStorage.getItem('token') || ''
+  const token = sessionStorage.getItem('token') || ''
   if (!token) return {}
   return {
     Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`
@@ -334,7 +334,7 @@ const handleFile = async (e) => {
   if (!file) return
   const formData = new FormData()
   formData.append('file', file)
-  const token = localStorage.getItem('token')
+  const token = sessionStorage.getItem('token')
   const uploadUrl = `/api/upload/${lectureId}`
   try {
     const res = await axios.post(uploadUrl, formData, {

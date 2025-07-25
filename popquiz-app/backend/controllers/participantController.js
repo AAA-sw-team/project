@@ -347,6 +347,28 @@ const checkJoinStatus = async (req, res) => {
 };
 
 /**
+ * 检查用户是否曾经加入过讲座（历史记录）
+ * GET /api/participants/check-history/:lectureId
+ * 需要登录
+ */
+const checkHasEverJoined = async (req, res) => {
+  const lectureId = req.params.lectureId;
+  const userId = req.user.userId || req.user.id;
+
+  try {
+    const hasJoined = await participantModel.hasUserEverJoined(lectureId, userId);
+    res.json({ 
+      hasJoined,
+      lectureId: parseInt(lectureId),
+      userId 
+    });
+  } catch (err) {
+    console.error('[participantController] 检查历史加入状态失败:', err.message);
+    res.status(500).json({ error: '检查历史加入状态失败', detail: err.message });
+  }
+};
+
+/**
  * 获取已结束的讲座列表（供用户查看历史讲座）
  * GET /api/participants/finished-lectures
  * 需要登录
@@ -401,12 +423,96 @@ const getFinishedLectures = async (req, res) => {
   }
 };
 
+/**
+ * 获取讲座参与者数量
+ * GET /api/participants/count/:lectureId
+ * 公开接口，任何人都可以查看
+ */
+const getLectureParticipantCount = async (req, res) => {
+  const lectureId = req.params.lectureId;
+
+  try {
+    // 检查讲座是否存在
+    const [lectureRows] = await pool.promise().query('SELECT * FROM lectures WHERE id = ?', [lectureId]);
+    if (!lectureRows.length) {
+      return res.status(404).json({ error: '讲座不存在' });
+    }
+
+    const lecture = lectureRows[0];
+    
+    // 获取当前参与者数量
+    const participantCount = await participantModel.getLectureParticipantCount(lectureId);
+    
+    // 获取在线参与者数量（最近5分钟内有活动的）
+    const [onlineRows] = await pool.promise().query(
+      `SELECT COUNT(DISTINCT user_id) as online_count 
+       FROM lecture_participants 
+       WHERE lecture_id = ? 
+       AND status = 'joined' 
+       AND last_seen >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)`,
+      [lectureId]
+    );
+    
+    const onlineCount = onlineRows[0].online_count || 0;
+
+    const result = {
+      lecture_id: parseInt(lectureId),
+      lecture_title: lecture.title,
+      lecture_status: lecture.status,
+      total_participants: participantCount,
+      online_participants: onlineCount,
+      updated_at: new Date().toISOString()
+    };
+
+    res.json(result);
+  } catch (err) {
+    console.error('[participantController] 获取参与者数量失败:', err.message);
+    res.status(500).json({ error: '获取参与者数量失败', detail: err.message });
+  }
+};
+
+/**
+ * 更新用户最后活跃时间（心跳接口）
+ * POST /api/participants/heartbeat/:lectureId
+ * 需要登录
+ */
+const updateHeartbeat = async (req, res) => {
+  const lectureId = req.params.lectureId;
+  const userId = req.user.userId || req.user.id;
+
+  try {
+    // 检查用户是否已加入讲座
+    const isJoined = await participantModel.isUserInLecture(lectureId, userId);
+    if (!isJoined) {
+      return res.status(403).json({ error: '用户未加入此讲座' });
+    }
+
+    // 更新最后活跃时间
+    await pool.promise().query(
+      'UPDATE lecture_participants SET last_seen = NOW() WHERE lecture_id = ? AND user_id = ?',
+      [lectureId, userId]
+    );
+
+    res.json({ 
+      success: true, 
+      message: '心跳更新成功',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('[participantController] 更新心跳失败:', err.message);
+    res.status(500).json({ error: '更新心跳失败', detail: err.message });
+  }
+};
+
 module.exports = {
   joinLecture,
   leaveLecture,
   getMyJoinedLectures,
   getLectureParticipants,
   checkJoinStatus,
+  checkHasEverJoined,
   getLectureReview,
-  getFinishedLectures
+  getFinishedLectures,
+  getLectureParticipantCount,
+  updateHeartbeat
 };
