@@ -57,7 +57,7 @@
           <div class="stat-label">正面反馈</div>
         </div>
         <div class="stat-card">
-          <div class="stat-number">{{ statsSummary.average }}</div>
+          <div class="stat-number">{{ statsSummary.average.toFixed(1) }}</div>
           <div class="stat-label">平均评分</div>
         </div>
       </div>
@@ -121,7 +121,7 @@ async function fetchStats() {
       const statArr = res.data.data.stats || []
       const total = res.data.data.totalCount || 0
       const positive = statArr.find(s => s.feedback_type === 'good')?.count || 0
-      const average = total > 0 ? (positive * 5 / total).toFixed(1) : '0.0'
+      const average = total > 0 ? parseFloat((positive * 5 / total).toFixed(1)) : 0
       statsSummary.value = { total, positive, average }
     } else {
       stats.value = []
