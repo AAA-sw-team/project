@@ -35,6 +35,9 @@ app.use('/api/upload', uploadRoutes);
 const participantRoutes = require('./routers/participantRoutes');
 app.use('/api/participants', participantRoutes);
 
+const userRouters = require('./routers/userRouters');
+app.use('/api/users', userRouters);
+
 // 挂载反馈路由
 const feedbackRoutes = require('./routers/feedbackRoutes');
 app.use('/api/feedback', feedbackRoutes);

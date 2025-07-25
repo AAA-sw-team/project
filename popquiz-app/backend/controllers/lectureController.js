@@ -212,6 +212,8 @@ async function getAllLectures(req, res) {
       id: item.id,
       title: item.title,
       name: item.name,
+      status: item.status,
+      description: item.description,
       created_at: item.created_at
     }));
     res.json(result);

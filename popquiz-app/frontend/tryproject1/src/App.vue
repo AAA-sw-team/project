@@ -29,7 +29,7 @@
                 <div class="lecture-details">
                   <div class="lecture-item">
                     <span class="item-icon">👤</span>
-                    <span class="item-label">讲者：</span>
+                    <span class="item-label">讲师：</span>
                     <span class="item-value">{{ getCurrentLecture().speaker || '无' }}</span>
                   </div>
                   <div class="lecture-item">
@@ -97,7 +97,7 @@
           </div>
           <div class="user-info" v-if="getUserRole()">
             <span class="user-role-badge" :class="getUserRole()">
-              {{ getUserRole() === 'speaker' ? '📢 讲者' : '👥 听众' }}
+              {{ getUserRole() === 'speaker' ? '📢 讲师' : getUserRole() === 'listener' ? '👤 听众' : '🛠 组织者' }}
             </span>
           </div>
         </nav>
@@ -184,6 +184,7 @@ const toggleLectureInfo = async () => {
       } catch (e) {
         console.warn('获取参与者数量失败:', e)
       }
+
       currentLectureData.value = {
         ...lecture,
         participants: participantCount,
@@ -417,29 +418,32 @@ const handleEndLecture = async () => {
 // 首页按钮点击处理
 const handleHomeClick = async () => {
   const userRole = getUserRole()
-  
-  if (!userRole) {
-    // 未登录时不做任何操作
+  if (userRole === 'organizer') {
+    router.push('/organizer')
     return
   }
-  
-  try {
-    // 标记这是通过首页按钮的合法导航
-    sessionStorage.setItem('homeButtonClicked', 'true')
-    
-    if (userRole === 'speaker') {
-      // 讲者点击首页时，不退出讲座，直接导航到首页
+  if (userRole === 'speaker') {
+    // 检查是否在讲座中
+    if (route.path.includes('/lecture/')) {
+      if (confirm('点击首页将退出当前讲座，确定要继续吗？')) {
+        try {
+          await exitCurrentLecture()
+          // 标记这是通过首页按钮的合法导航
+          sessionStorage.setItem('homeButtonClicked', 'true')
+          router.push('/speaker/home')
+        } catch (error) {
+          // 如果退出讲座失败，不进行导航
+          console.error('退出讲座失败，取消导航:', error)
+        }
+      }
+    } else {
+      // 标记这是通过首页按钮的合法导航
+      sessionStorage.setItem('homeButtonClicked', 'true')
       router.push('/speaker/home')
-    } else if (userRole === 'listener') {
-      // 听众点击首页时，不退出讲座，直接导航到首页
-      router.push('/listener/home')
     }
-  } catch (error) {
-    console.error('首页导航过程中发生错误:', error)
-    // 即使发生错误，也尝试导航到相应的首页
-    const targetPath = userRole === 'speaker' ? '/speaker/home' : '/listener/home'
-    sessionStorage.setItem('homeButtonClicked', 'true')
-    router.push(targetPath)
+  } else if (userRole === 'listener') {
+    // 听众点击首页时，不退出讲座，直接导航到首页
+    router.push('/listener/home')
   }
 }
 
@@ -618,6 +622,7 @@ const updateCurrentLecture = async () => {
   }
   
   if (lectureId) {
+
     try {
       console.log('正在获取讲座信息，ID:', lectureId)
       const lecture = await getLectureById(lectureId)
@@ -697,7 +702,7 @@ const exitCurrentLecture = async () => {
     }
     
     // 根据用户角色显示不同的提示
-    const roleText = userRole === 'speaker' ? '讲者' : '听众'
+    const roleText = userRole === 'speaker' ? '讲师' : '听众'
     const message = userRole === 'listener' && !isLectureEnded(currentLecture) 
       ? `${roleText}已退出讲座"${currentLecture.title}"，您可以随时重新进入未结束的讲座`
       : `${roleText}已成功退出讲座"${currentLecture.title}"`
@@ -734,7 +739,7 @@ const exitCurrentLecture = async () => {
         sessionStorage.removeItem('currentLecture')
       }
       
-      const roleText = userRole === 'speaker' ? '讲者' : '听众'
+      const roleText = userRole === 'speaker' ? '讲师' : '听众'
       alert(`${roleText}已在本地退出讲座，但服务器状态可能未同步`)
     } else {
       // 重新抛出错误，让调用者知道失败了
@@ -1365,6 +1370,12 @@ function formatLectureTimePanel(lecture) {
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(62, 175, 124, 0.1) 100%);
   color: #667eea;
   border-color: rgba(102, 126, 234, 0.3);
+}
+
+.user-role-badge.organizer {
+  background: linear-gradient(135deg, #ff9800 0%, #ffb74d 100%);
+  color: #fff;
+  border-color: #ff9800;
 }
 
 .user-role-badge:hover {

@@ -1,7 +1,16 @@
 <template>
-  <div class="score-bg">
-    <div class="score-card">
-      <h3 class="score-title">讲座成绩总览</h3>
+  <div class="stats-wrapper">
+    <div class="page-header">
+      <div class="title-icon animate-bounce">📈</div>
+      <h2 class="stats-title animate-fade-in">讲座成绩总览</h2>
+      <p class="subtitle animate-fade-in-delay">查看讲座参与者的成绩与表现</p>
+    </div>
+    <div v-if="users.length === 0" class="empty-state">
+      <div class="empty-icon">📄</div>
+      <h3>暂无成绩数据</h3>
+      <p>暂无参与者成绩信息</p>
+    </div>
+    <div v-else class="score-content">
       <table class="score-table">
         <thead>
           <tr>
@@ -33,36 +42,69 @@ const users = ref([
 ])
 </script>
 <style scoped>
-.score-bg {
-  min-height: 70vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-}
-.score-card {
-  background: #fff;
-  border-radius: 18px;
-  box-shadow: 0 2px 12px rgba(44,209,171,0.07);
-  padding: 40px 32px 32px 32px;
-  max-width: 600px;
-  width: 100%;
+.stats-wrapper {
+  max-width: 800px;
   margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  padding: 1.8rem;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(16, 163, 127, 0.12);
+  border: 1px solid rgba(16, 163, 127, 0.1);
+  position: relative;
+  overflow: hidden;
 }
-.score-title {
-  font-size: 1.6rem;
+.stats-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #10a37f 0%, #059669 50%, #047857 100%);
+  z-index: 1;
+}
+.page-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+.title-icon {
+  font-size: 1.8rem;
+  margin-bottom: 0.8rem;
+  filter: drop-shadow(0 3px 6px rgba(16, 163, 127, 0.2));
+}
+.stats-title {
+  font-size: 1.8rem;
   font-weight: 700;
-  color: #2d8c7f;
-  margin-bottom: 18px;
+  color: #10a37f;
+  margin: 0 0 0.4rem 0;
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 3px rgba(16, 163, 127, 0.1);
+}
+.subtitle {
+  font-size: 1rem;
+  color: #047857;
+  margin: 0;
+  font-weight: 500;
+  opacity: 0.8;
+}
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #047857;
+}
+.empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.6;
+}
+.score-content {
+  width: 100%;
 }
 .score-table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 18px;
-  background: #f8fdfb;
+  background: #f8fafc;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 1px 6px rgba(44,209,171,0.06);
@@ -90,5 +132,36 @@ const users = ref([
 .score-rate {
   color: #26c6da;
   font-weight: bold;
+}
+/* 动画 */
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-10px);
+  }
+  60% {
+    transform: translateY(-5px);
+  }
+}
+.animate-bounce {
+  animation: bounce 2s infinite;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in {
+  animation: fadeIn 0.8s ease-out;
+}
+.animate-fade-in-delay {
+  animation: fadeIn 0.8s ease-out 0.3s both;
 }
 </style>

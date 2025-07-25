@@ -60,6 +60,8 @@ class FeedbackController {
             const { lectureId } = req.params;
             const { page = 1, limit = 50 } = req.query;
             const userId = req.user.userId;
+            const userRole = req.user.role;
+
 
             console.log('获取讲座反馈 - 讲座ID:', lectureId, '用户ID:', userId);
             console.log('完整用户信息:', req.user);
@@ -70,7 +72,7 @@ class FeedbackController {
             console.log('用户是否为讲座创建者:', hasPermission);
             
             // 如果权限验证失败，让我们查看讲座的实际创建者
-            if (!hasPermission) {
+            if (!hasPermission&& userRole !== 'organizer') {
                 const lectureInfo = await require('../models/lectureModel').getLectureById(lectureId);
                 console.log('讲座信息:', lectureInfo);
                 console.log('权限验证失败 - 临时跳过权限检查进行调试');
@@ -79,6 +81,7 @@ class FeedbackController {
                 //     success: false,
                 //     message: '只有讲座创建者可以查看反馈'
                 // });
+
             }
 
             const result = await FeedbackModel.getLectureFeedback(
@@ -118,6 +121,8 @@ class FeedbackController {
         try {
             const { lectureId } = req.params;
             const userId = req.user.userId;
+            const userRole = req.user.role;
+
 
             // 验证讲师权限
             console.log('获取反馈统计 - 讲座ID:', lectureId, '用户ID:', userId);
@@ -125,7 +130,7 @@ class FeedbackController {
             const hasPermission = await ParticipantModel.isLectureCreator(lectureId, userId);
             console.log('统计权限验证结果:', hasPermission);
             
-            if (!hasPermission) {
+            if (!hasPermission && userRole !== 'organizer') {
                 const lectureInfo = await require('../models/lectureModel').getLectureById(lectureId);
                 console.log('讲座信息:', lectureInfo);
                 console.log('统计权限验证失败 - 临时跳过权限检查进行调试');
