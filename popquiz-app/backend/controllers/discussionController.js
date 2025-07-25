@@ -142,9 +142,14 @@ class DiscussionController {
             const { page = 1, limit = 30 } = req.query;
             const userId = req.user.userId;
 
+            console.log('获取讨论消息 - 讲座ID:', lectureId, '用户ID:', userId, '页码:', page, '限制:', limit);
+
             // 检查访问权限
             const canAccess = await DiscussionModel.canSendMessage(lectureId, userId);
+            console.log('用户发言权限检查结果:', canAccess);
+            
             if (!canAccess.canSend && !await ParticipantModel.isLectureCreator(lectureId, userId)) {
+                console.log('用户无权限查看讨论');
                 return res.status(403).json({
                     success: false,
                     message: '没有权限查看讨论'
@@ -157,8 +162,12 @@ class DiscussionController {
                 parseInt(limit)
             );
 
+            console.log('从数据库获取的讨论数据:', result);
+            console.log('讨论消息数量:', result?.messages?.length || 0);
+
             // 获取用户的点赞状态
             const userLikes = await DiscussionModel.getUserLikeStatus(lectureId, userId);
+            console.log('用户点赞状态:', userLikes);
 
             // 添加用户点赞状态
             result.messages = result.messages.map(message => ({
@@ -169,6 +178,8 @@ class DiscussionController {
                     isLikedByUser: userLikes.includes(reply.id)
                 }))
             }));
+
+            console.log('处理后的讨论数据:', result);
 
             res.json({
                 success: true,

@@ -15,7 +15,8 @@
     <div v-else-if="!lecture" class="empty-state">
       <div class="empty-icon">📚</div>
       <h3>暂无讲座数据</h3>
-      <p>未找到当前讲座的统计信息。</p>
+      <p>未找到当前讲座的统计信息，请检查讲座ID是否正确。</p>
+      <button @click="loadData" class="retry-btn">重新加载</button>
     </div>
     
     <div v-else class="lecture-content">
@@ -43,11 +44,11 @@
         <h3>📈 整体统计</h3>
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-number">{{ lecture.overallStats?.total_users || 0 }}</div>
+            <div class="stat-number">{{ lecture.userRankings?.length || 0 }}</div>
             <div class="stat-label">参与用户</div>
           </div>
           <div class="stat-card">
-            <div class="stat-number">{{ lecture.overallStats?.total_answers || 0 }}</div>
+            <div class="stat-number">{{ getTotalAnswers() }}</div>
             <div class="stat-label">总答题数</div>
           </div>
           <div class="stat-card">
@@ -106,7 +107,7 @@
               </div>
             </div>
             <div class="accuracy-badge" :class="getAccuracyClass(user.accuracy)">
-              {{ user.accuracy }}%
+              {{ Math.round(user.accuracy || 0) }}%
             </div>
           </div>
         </div>
@@ -132,7 +133,7 @@
             </div>
             <div class="summary-item">
               <div class="summary-label">正确率</div>
-              <div class="summary-value accuracy">{{ selectedUser.accuracy }}%</div>
+              <div class="summary-value accuracy">{{ Math.round(selectedUser.accuracy || 0) }}%</div>
             </div>
           </div>
           <div v-if="selectedUserAnswers && selectedUserAnswers.length > 0" class="user-answers">
@@ -169,7 +170,7 @@ const selectedUserAnswers = ref<any[]>([])
 // 获取讲座基本信息
 const fetchLectureInfo = async (id: string) => {
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
     if (!token) {
       console.error('未找到认证令牌')
       return null
@@ -184,9 +185,11 @@ const fetchLectureInfo = async (id: string) => {
     
     if (response.ok) {
       const data = await response.json()
-      return data
+      console.log('讲座基本信息:', data)
+      // 根据后端返回的数据结构调整
+      return data.lecture || data
     } else {
-      console.error('获取讲座信息失败:', response.statusText)
+      console.error('获取讲座信息失败:', response.status, response.statusText)
       return null
     }
   } catch (error) {
@@ -198,7 +201,12 @@ const fetchLectureInfo = async (id: string) => {
 // 获取讲座统计信息
 const fetchLectureStats = async (id: string) => {
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    if (!token) {
+      console.error('未找到认证令牌')
+      return null
+    }
+
     const response = await fetch(`/api/statistics/lecture/${id}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -207,9 +215,13 @@ const fetchLectureStats = async (id: string) => {
     })
     
     if (response.ok) {
-      return await response.json()
+      const data = await response.json()
+      console.log('讲座统计数据:', data)
+      return data
+    } else {
+      console.error('获取讲座统计失败:', response.status, response.statusText)
+      return null
     }
-    return null
   } catch (error) {
     console.error('获取讲座统计失败:', error)
     return null
@@ -219,8 +231,13 @@ const fetchLectureStats = async (id: string) => {
 // 获取题目统计信息
 const fetchQuizStats = async (id: string) => {
   try {
-    const token = localStorage.getItem('token')
-    const response = await fetch(`/api/answers/statistics/${id}`, {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    if (!token) {
+      console.error('未找到认证令牌')
+      return []
+    }
+
+    const response = await fetch(`/api/answers/lecture/${id}/stats`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -228,9 +245,13 @@ const fetchQuizStats = async (id: string) => {
     })
     
     if (response.ok) {
-      return await response.json()
+      const data = await response.json()
+      console.log('题目统计数据:', data)
+      return data
+    } else {
+      console.error('获取题目统计失败:', response.status, response.statusText)
+      return []
     }
-    return []
   } catch (error) {
     console.error('获取题目统计失败:', error)
     return []
@@ -240,8 +261,13 @@ const fetchQuizStats = async (id: string) => {
 // 获取用户答题详情
 const fetchUserAnswers = async (userId: number) => {
   try {
-    const token = localStorage.getItem('token')
-    const response = await fetch(`/api/answers/user/${userId}/lecture/${lectureId}`, {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    if (!token) {
+      console.error('未找到认证令牌')
+      return []
+    }
+
+    const response = await fetch(`/api/answers/lecture/${lectureId}/user/${userId}/answers`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -249,30 +275,41 @@ const fetchUserAnswers = async (userId: number) => {
     })
     
     if (response.ok) {
-      return await response.json()
+      const data = await response.json()
+      console.log('用户答题详情:', data)
+      return data
+    } else {
+      console.error('获取用户答题详情失败:', response.status, response.statusText)
+      return []
     }
-    return []
   } catch (error) {
     console.error('获取用户答题详情失败:', error)
     return []
   }
 }
 
-// 新增：获取讲座参与人数
+// 获取讲座参与人数
 const fetchParticipantCount = async (id: string) => {
   try {
-    const token = localStorage.getItem('token')
-    const response = await fetch(`/api/participants/lecture/${id}`, {
-      headers: {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    
+    const response = await fetch(`/api/participants/count/${id}`, {
+      headers: token ? {
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      } : {
         'Content-Type': 'application/json'
       }
     })
+    
     if (response.ok) {
       const data = await response.json()
-      return data.participant_count || 0
+      console.log('参与人数数据:', data)
+      return data.participant_count || data.count || 0
+    } else {
+      console.error('获取参与人数失败:', response.status, response.statusText)
+      return 0
     }
-    return 0
   } catch (error) {
     console.error('获取参与人数失败:', error)
     return 0
@@ -289,6 +326,8 @@ const loadData = async () => {
 
   loading.value = true
   try {
+    console.log('开始加载讲座数据，ID:', lectureId)
+    
     // 获取讲座基本信息
     const lectureInfo = await fetchLectureInfo(lectureId as string)
     if (!lectureInfo) {
@@ -299,58 +338,36 @@ const loadData = async () => {
 
     // 获取讲座统计
     const stats = await fetchLectureStats(lectureId as string)
+    console.log('统计数据:', stats)
     
     // 获取题目统计
     const quizStats = await fetchQuizStats(lectureId as string)
+    console.log('题目统计:', quizStats)
     
     // 获取参与人数
     const participantCount = await fetchParticipantCount(lectureId as string)
+    console.log('参与人数:', participantCount)
     
     // 构建讲座数据
     lecture.value = {
       ...lectureInfo,
-      overallStats: stats?.overallStats || null,
+      overallStats: stats?.overallStats || {
+        total_users: stats?.rankings?.length || 0,
+        total_answers: 0,
+        total_correct: 0
+      },
       userRankings: stats?.rankings || [],
-      participantCount: participantCount, // 用接口返回的真实人数
+      participantCount: participantCount,
       quizStats: quizStats || [],
       quizCount: (quizStats || []).length
     }
     
+    console.log('最终讲座数据:', lecture.value)
+    
   } catch (error) {
     console.error('加载数据失败:', error)
-    // 如果API调用失败，使用模拟数据
-    // lecture.value = getMockData()
   }
   loading.value = false
-}
-
-// 模拟数据（用于开发测试）
-const getMockData = () => {
-  return {
-    id: lectureId,
-    title: 'AI时代的未来发展趋势',
-    created_at: '2024-01-15T10:00:00Z',
-    participantCount: 25,
-    quizCount: 4,
-    overallStats: {
-      total_users: 25,
-      total_answers: 96,
-      total_correct: 78
-    },
-    quizStats: [
-      { quizId: 1, question: '人工智能的核心技术是什么？', totalAnswers: 23, correctAnswers: 18, accuracy: 0.783 },
-      { quizId: 2, question: 'ChatGPT属于哪种AI技术？', totalAnswers: 25, correctAnswers: 22, accuracy: 0.88 },
-      { quizId: 3, question: '机器学习与深度学习的关系是？', totalAnswers: 24, correctAnswers: 15, accuracy: 0.625 },
-      { quizId: 4, question: 'AI在医疗领域的应用包括？', totalAnswers: 24, correctAnswers: 23, accuracy: 0.958 }
-    ],
-    userRankings: [
-      { user_id: 101, username: '张三', correct_count: 4, total_answered: 4, accuracy: 100.0 },
-      { user_id: 102, username: '李四', correct_count: 3, total_answered: 4, accuracy: 75.0 },
-      { user_id: 103, username: '王五', correct_count: 3, total_answered: 4, accuracy: 75.0 },
-      { user_id: 104, username: '赵六', correct_count: 2, total_answered: 4, accuracy: 50.0 },
-      { user_id: 105, username: '陈七', correct_count: 4, total_answered: 4, accuracy: 100.0 }
-    ]
-  }
 }
 
 // 选择用户查看详情
@@ -371,8 +388,30 @@ const closeUserDetail = () => {
 
 // 计算整体正确率
 const calculateOverallAccuracy = (stats: any) => {
-  if (!stats || !stats.total_answers || stats.total_answers === 0) return 0
+  if (!stats || !stats.total_answers || stats.total_answers === 0) {
+    // 如果没有整体统计数据，从排行榜数据计算
+    if (lecture.value && lecture.value.userRankings && lecture.value.userRankings.length > 0) {
+      const totalAnswered = lecture.value.userRankings.reduce((sum: number, user: any) => sum + (user.total_answered || 0), 0)
+      const totalCorrect = lecture.value.userRankings.reduce((sum: number, user: any) => sum + (user.correct_count || 0), 0)
+      if (totalAnswered > 0) {
+        return ((totalCorrect / totalAnswered) * 100).toFixed(1)
+      }
+    }
+    return 0
+  }
   return ((stats.total_correct / stats.total_answers) * 100).toFixed(1)
+}
+
+// 计算总答题数
+const getTotalAnswers = () => {
+  if (lecture.value?.overallStats?.total_answers) {
+    return lecture.value.overallStats.total_answers
+  }
+  // 从排行榜数据计算
+  if (lecture.value?.userRankings && lecture.value.userRankings.length > 0) {
+    return lecture.value.userRankings.reduce((sum: number, user: any) => sum + (user.total_answered || 0), 0)
+  }
+  return 0
 }
 
 // 格式化日期
@@ -489,6 +528,23 @@ onMounted(() => {
   font-size: 3rem;
   margin-bottom: 1rem;
   opacity: 0.6;
+}
+
+.retry-btn {
+  background: #10a37f;
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-top: 1rem;
+}
+
+.retry-btn:hover {
+  background: #059669;
 }
 
 .lectures-container {

@@ -25,6 +25,37 @@ async function createLecture(req, res) {
   if (!title || !description) {
     return res.status(400).json({ error: '标题和描述不能为空' });
   }
+  
+  // 生成6位数的随机ID并确保唯一性
+  const generateUniqueId = async () => {
+    let lectureId;
+    let isUnique = false;
+    let attempts = 0;
+    const maxAttempts = 100; // 防止无限循环
+    
+    while (!isUnique && attempts < maxAttempts) {
+      // 生成100000-999999之间的6位数
+      lectureId = Math.floor(Math.random() * 900000) + 100000;
+      
+      // 检查ID是否已存在
+      const [existingRows] = await pool.promise().query(
+        'SELECT id FROM lectures WHERE id = ?',
+        [lectureId]
+      );
+      
+      if (existingRows.length === 0) {
+        isUnique = true;
+      }
+      attempts++;
+    }
+    
+    if (!isUnique) {
+      throw new Error('无法生成唯一的讲座ID');
+    }
+    
+    return lectureId;
+  };
+  
   try {
     // 检查同一讲者是否有重复标题
     const [dupRows] = await pool.promise().query(
@@ -34,9 +65,18 @@ async function createLecture(req, res) {
     if (dupRows.length > 0) {
       return res.status(409).json({ error: '同一个讲者不能创建重复标题的讲座' });
     }
-    // 创建讲座
-    const [result] = await createLecture_db(title, description, user.userId, user.name);
-    const [rows] = await pool.promise().query('SELECT id, title, name, created_at FROM lectures WHERE id = ?', [result.insertId]);
+    
+    // 生成唯一的6位数ID
+    const lectureId = await generateUniqueId();
+    
+    // 使用指定的ID创建讲座
+    await pool.promise().query(
+      'INSERT INTO lectures (id, title, description, speaker_id, name, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+      [lectureId, title, description, user.userId, user.name]
+    );
+    
+    // 获取创建的讲座信息
+    const [rows] = await pool.promise().query('SELECT id, title, name, created_at FROM lectures WHERE id = ?', [lectureId]);
     const lectureInfo = rows[0];
     res.json({ message: '讲座创建成功', lecture: lectureInfo });
   } catch (err) {

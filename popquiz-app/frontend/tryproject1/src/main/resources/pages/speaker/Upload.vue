@@ -94,24 +94,28 @@
       <button 
         class="main-btn publish-btn" 
         @click="() => { console.log('发布按钮被点击了'); publishQuiz(); }" 
-        :disabled="!quizzes || !quizzes.length || isGenerating || isRegenerating || isPublishing"
+        :disabled="isPublishButtonDisabled"
+        :class="{ 'btn-disabled': isPublishButtonDisabled }"
       >
         <span class="btn-icon">{{ isPublishing ? '⏳' : '🚀' }}</span>
         {{ isPublishing ? '正在发布...' : '发布题目' }}
       </button>
       <button 
-        class="main-btn end-lecture-btn" 
-        @click="endLecture"
-        :disabled="isGenerating || isRegenerating || isPublishing || isEndingLecture"
+        class="main-btn view-published-btn" 
+        @click="togglePublishedView"
+        :disabled="isGenerating || isRegenerating || isPublishing"
       >
-        <span class="btn-icon">{{ isEndingLecture ? '⏳' : '🔚' }}</span>
-        {{ isEndingLecture ? '正在结束...' : '结束讲座' }}
+        <span class="btn-icon">{{ showPublished ? '👁️' : '📋' }}</span>
+        {{ showPublished ? '隐藏已发布' : '查看已发布' }}
       </button>
     </div>
     <div v-if="quizzes && quizzes.length" class="quiz-list-section animate-slide-up-delay">
       <div class="section-header">
         <div class="section-icon">🎯</div>
-        <h3 class="quiz-list-title">AI 生成的题目 ({{ quizzes.length }})</h3>
+        <h3 class="quiz-list-title">
+          AI 生成的题目 ({{ quizzes.length }}) 
+          <span class="unpublished-badge">未发布</span>
+        </h3>
       </div>
       <div class="quiz-bubble-list">
         <div v-for="(quiz, idx) in quizzes" :key="quiz && quiz.id ? quiz.id : idx" 
@@ -135,6 +139,59 @@
             </li>
           </ul>
         </div>
+      </div>
+    </div>
+    
+    <!-- 已发布题目区域 -->
+    <div v-if="showPublished && publishedQuizzes && publishedQuizzes.length" class="quiz-list-section animate-slide-up-delay">
+      <div class="section-header">
+        <div class="section-icon">📋</div>
+        <h3 class="quiz-list-title">
+          已发布的题目 ({{ publishedQuizzes.length }}) 
+          <span class="published-badge">已发布</span>
+        </h3>
+      </div>
+      <div class="quiz-bubble-list">
+        <div v-for="(quiz, idx) in publishedQuizzes" :key="quiz && quiz.id ? quiz.id : idx" 
+             class="quiz-bubble published-quiz animate-quiz-item" 
+             :style="{ animationDelay: `${idx * 0.1}s` }">
+          <div class="bubble-header">
+            <span class="question-number">题目 {{ idx + 1 }}</span>
+            <div class="quiz-group-info">
+              <span class="group-badge">第{{ quiz.group_id }}组</span>
+            </div>
+          </div>
+          <div class="quiz-question">{{ quiz.question }}</div>
+          <ul class="quiz-options">
+            <li v-for="(opt, oidx) in getPublishedQuizOptions(quiz)" :key="oidx" 
+                :class="{ 'correct-option': isCorrectOptionForPublished(quiz.correct_option, oidx) }">
+              <span class="option-label">{{ String.fromCharCode(65 + oidx) }}.</span>
+              <span class="option-text">{{ opt }}</span>
+              <span v-if="isCorrectOptionForPublished(quiz.correct_option, oidx)" 
+                    class="correct-mark">✓ 正确</span>
+            </li>
+          </ul>
+          <div class="quiz-meta">
+            <span class="publish-time">发布时间: {{ formatDateTime(quiz.created_at) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 已发布题目加载状态 -->
+    <div v-if="showPublished && loadingPublished" class="loading-published-section animate-slide-up-delay">
+      <div class="loading-published-content">
+        <div class="loading-spinner">⏳</div>
+        <p>正在加载已发布题目...</p>
+      </div>
+    </div>
+    
+    <!-- 已发布题目为空的状态 -->
+    <div v-if="showPublished && !loadingPublished && (!publishedQuizzes || publishedQuizzes.length === 0)" class="empty-published-section animate-slide-up-delay">
+      <div class="empty-published-content">
+        <div class="empty-icon">📭</div>
+        <h3>暂无已发布题目</h3>
+        <p>您还没有发布任何题目。生成题目后点击"发布题目"即可发布给听众答题。</p>
       </div>
     </div>
     
@@ -248,7 +305,7 @@ interface UploadedFile {
   created_at?: string
 }
 
-const quizzes = ref([])
+const quizzes = ref<Quiz[]>([])
 const fileId = ref('')
 const route = useRoute()
 const router = useRouter()
@@ -276,6 +333,11 @@ const isPublishing = ref(false)
 // 添加结束讲座的加载状态  
 const isEndingLecture = ref(false)
 
+// 已发布题目相关状态
+const showPublished = ref(false)
+const publishedQuizzes = ref<any[]>([])
+const loadingPublished = ref(false)
+
 // 添加通知状态
 const notification = ref({
   show: false,
@@ -286,6 +348,21 @@ const notification = ref({
 // 计算属性
 const hasSelectedFiles = computed(() => {
   return fileId.value || selectedFiles.value.length > 0
+})
+
+// 计算是否有未发布的题目
+const hasUnpublishedQuizzes = computed(() => {
+  return quizzes.value.length > 0
+})
+
+// 计算发布按钮是否应该被禁用
+const isPublishButtonDisabled = computed(() => {
+  return !hasUnpublishedQuizzes.value || isGenerating.value || isRegenerating.value || isPublishing.value
+})
+
+// 计算已发布题目数量
+const publishedQuizzesCount = computed(() => {
+  return publishedQuizzes.value.length
 })
 
 function getAuthHeader() {
@@ -328,18 +405,85 @@ const isCorrectOption = (correctOption: string | undefined, optionIndex: number)
          normalizedCorrect.endsWith(optionLetter)
 }
 
+// 已发布题目相关函数
+const togglePublishedView = async () => {
+  showPublished.value = !showPublished.value
+  if (showPublished.value) {
+    await loadPublishedQuizzes()
+  }
+}
+
+const loadPublishedQuizzes = async () => {
+  loadingPublished.value = true
+  try {
+    const response = await axios.get(`/api/quiz/lecture/${lectureId}/published`, {
+      headers: getAuthHeader()
+    })
+    
+    if (response.data && response.data.success && response.data.data) {
+      publishedQuizzes.value = response.data.data.quizzes || []
+      console.log('已发布题目加载成功:', publishedQuizzes.value.length, '道题目')
+    }
+  } catch (error) {
+    console.error('加载已发布题目失败:', error)
+    showNotification('❌ 加载已发布题目失败', 'error')
+  } finally {
+    loadingPublished.value = false
+  }
+}
+
+const getPublishedQuizOptions = (quiz: any) => {
+  return [quiz.option_a, quiz.option_b, quiz.option_c, quiz.option_d].filter(Boolean)
+}
+
+const isCorrectOptionForPublished = (correctOption: string | undefined, optionIndex: number) => {
+  if (!correctOption) return false
+  
+  // 将选项索引转换为字母 (0->A, 1->B, 2->C, 3->D)
+  const optionLetter = String.fromCharCode(65 + optionIndex)
+  
+  // 处理各种可能的正确答案格式
+  const normalizedCorrect = correctOption.toString().toUpperCase().trim()
+  
+  // 支持 "A", "B", "C", "D" 或者 "选项A", "选项B" 等格式
+  return normalizedCorrect === optionLetter || 
+         normalizedCorrect === `选项${optionLetter}` ||
+         normalizedCorrect.endsWith(optionLetter)
+}
+
+const formatDateTime = (dateString: string) => {
+  try {
+    const date = new Date(dateString)
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch (error) {
+    return '时间格式错误'
+  }
+}
+
 // 上传文件
 const handleFile = async (e) => {
   const file = e.target.files[0]
   if (!file) return
   const formData = new FormData()
   formData.append('file', file)
-  const token = sessionStorage.getItem('token')
   const uploadUrl = `/api/upload/${lectureId}`
+  
+  const authHeader = getAuthHeader()
+  if (!Object.keys(authHeader).length) {
+    showNotification('未找到授权令牌，请重新登录', 'error')
+    return
+  }
+  
   try {
     const res = await axios.post(uploadUrl, formData, {
       headers: {
-        Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`,
+        ...authHeader,
         'Content-Type': 'multipart/form-data'
       }
     })
@@ -375,7 +519,7 @@ const loadUploadedFiles = async () => {
   }
 }
 
-// 加载现有题目
+// 加载现有的未发布题目
 const loadExistingQuizzes = async () => {
   try {
     const res = await axios.get(`/api/quizzes/${lectureId}`, {
@@ -383,39 +527,61 @@ const loadExistingQuizzes = async () => {
     })
     
     if (res.data && res.data.length > 0) {
-      // 获取最新的题目组
-      const latestGroup = res.data.reduce((latest, current) => {
-        return new Date(current.created_at) > new Date(latest.created_at) ? current : latest
-      })
+      // 只获取未发布的题目 (published = 0 或 false)
+      const unpublishedQuizzes = res.data.filter(quiz => !quiz.published)
       
-      // 获取同组的所有题目
-      const groupQuizzes = res.data.filter(quiz => quiz.group_id === latestGroup.group_id)
+      console.log('所有题目:', res.data.length, '未发布题目:', unpublishedQuizzes.length)
       
-      console.log('加载的现有题目:', groupQuizzes)
-      
-      quizzes.value = groupQuizzes.map(quiz => {
-        // 确保正确答案格式统一
-        let correctOption = quiz.correct_option
-        if (correctOption) {
-          // 提取字母部分 (A, B, C, D)
-          const match = correctOption.toString().match(/[ABCD]/i)
-          correctOption = match ? match[0].toUpperCase() : correctOption
-        }
+      if (unpublishedQuizzes.length > 0) {
+        // 获取最新的未发布题目组
+        const latestGroup = unpublishedQuizzes.reduce((latest, current) => {
+          return new Date(current.created_at) > new Date(latest.created_at) ? current : latest
+        })
         
-        console.log('现有题目:', quiz.question, '正确答案:', correctOption)
+        // 获取同组的所有未发布题目
+        const groupQuizzes = unpublishedQuizzes.filter(quiz => quiz.group_id === latestGroup.group_id)
         
-        return {
-          id: quiz.id,
-          question: quiz.question,
-          options: [quiz.option_a, quiz.option_b, quiz.option_c, quiz.option_d],
-          correctOption: correctOption
-        }
-      })
-      currentGroupId.value = latestGroup.group_id
-      quizIds.value = groupQuizzes.map(quiz => quiz.id)
+        console.log('加载的未发布题目:', groupQuizzes)
+        
+        quizzes.value = groupQuizzes.map(quiz => {
+          // 确保正确答案格式统一
+          let correctOption = quiz.correct_option
+          if (correctOption) {
+            // 提取字母部分 (A, B, C, D)
+            const match = correctOption.toString().match(/[ABCD]/i)
+            correctOption = match ? match[0].toUpperCase() : correctOption
+          }
+          
+          console.log('未发布题目:', quiz.question, '正确答案:', correctOption)
+          
+          return {
+            id: quiz.id,
+            question: quiz.question,
+            options: [quiz.option_a, quiz.option_b, quiz.option_c, quiz.option_d],
+            correctOption: correctOption
+          }
+        })
+        currentGroupId.value = latestGroup.group_id
+        quizIds.value = groupQuizzes.map(quiz => quiz.id)
+        
+        showNotification(`加载了 ${groupQuizzes.length} 道未发布题目`, 'success')
+      } else {
+        // 没有未发布的题目，清空当前显示
+        quizzes.value = []
+        quizIds.value = []
+        currentGroupId.value = ''
+        console.log('没有未发布的题目')
+      }
+    } else {
+      // 没有题目
+      quizzes.value = []
+      quizIds.value = []
+      currentGroupId.value = ''
+      console.log('没有任何题目')
     }
   } catch (err) {
     console.error('加载题目失败:', err)
+    showNotification('加载题目失败: ' + (err.response?.data?.message || err.message), 'error')
   }
 }
 
@@ -653,9 +819,18 @@ const publishQuiz = async () => {
       'success'
     )
     
+    // 更新已发布题目计数
+    const publishedCount = quizzes.value.length
+    publishedQuizzes.value = [...publishedQuizzes.value, ...new Array(publishedCount)]
+    
+    // 清空已发布的题目（因为它们不再是"未发布"状态）
+    quizzes.value = []
+    quizIds.value = []
+    currentGroupId.value = ''
+    
     // 可选：显示额外的成功信息
     setTimeout(() => {
-      showNotification('💡 您可以在统计页面查看答题情况', 'success')
+      showNotification('💡 您可以在统计页面查看答题情况，或生成新的题目组', 'success')
     }, 2000)
     
   } catch (err) {
@@ -897,7 +1072,26 @@ onMounted(() => {
   // 然后加载其他数据
   loadUploadedFiles()
   loadExistingQuizzes()
+  // 初始化已发布题目计数（不显示具体内容，只获取数量）
+  loadPublishedQuizzesCount()
 })
+
+// 只加载已发布题目的数量，用于显示统计
+const loadPublishedQuizzesCount = async () => {
+  try {
+    const response = await axios.get(`/api/quiz/lecture/${lectureId}/published`, {
+      headers: getAuthHeader()
+    })
+    
+    if (response.data && response.data.success && response.data.data) {
+      // 只更新数量，不填充详细数据（除非用户点击查看）
+      const count = response.data.data.quizzes?.length || 0
+      publishedQuizzes.value = new Array(count) // 创建占位数组用于计数
+    }
+  } catch (error) {
+    console.error('加载已发布题目数量失败:', error)
+  }
+}
 </script>
 
 <style scoped>
@@ -1269,14 +1463,14 @@ onMounted(() => {
 }
 
 .regenerate-btn {
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
   color: white;
 }
 
 .regenerate-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  background: linear-gradient(135deg, #065f46 0%, #064e3b 100%);
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(14, 165, 233, 0.3);
+  box-shadow: 0 8px 25px rgba(4, 120, 87, 0.3);
 }
 
 .publish-btn {
@@ -1310,6 +1504,46 @@ onMounted(() => {
   animation: publishingShimmer 1.5s ease-in-out infinite;
 }
 
+/* 没有可发布题目时的禁用状态 */
+.btn-disabled {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%) !important;
+  color: #9ca3af !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.btn-disabled:hover {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 未发布标记样式 */
+.unpublished-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  margin-left: 0.5rem;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
 .end-lecture-btn {
   background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
   color: white;
@@ -1321,6 +1555,17 @@ onMounted(() => {
   box-shadow: 0 8px 25px rgba(220, 38, 38, 0.3);
 }
 
+.view-published-btn {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  color: white;
+}
+
+.view-published-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(52, 211, 153, 0.3);
+}
+
 .main-btn:disabled {
   background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
   cursor: not-allowed;
@@ -1330,6 +1575,117 @@ onMounted(() => {
 
 .btn-icon {
   font-size: 1.1rem;
+}
+
+/* 已发布题目样式 */
+.published-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  color: white;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  margin-left: 0.5rem;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.3);
+}
+
+.published-quiz {
+  border-left: 4px solid #16a34a;
+  background: rgba(22, 163, 74, 0.05);
+}
+
+.quiz-group-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.group-badge {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.quiz-meta {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.publish-time {
+  font-style: italic;
+}
+
+/* 已发布题目空状态 */
+.empty-published-section {
+  margin-top: 2rem;
+  padding: 3rem 2rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  text-align: center;
+  border: 1px solid rgba(16, 163, 127, 0.1);
+  box-shadow: 0 4px 20px rgba(16, 163, 127, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.empty-published-content .empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1.5rem;
+  opacity: 0.6;
+  display: block;
+}
+
+.empty-published-content h3 {
+  font-size: 1.5rem;
+  color: #6b7280;
+  margin-bottom: 0.8rem;
+  font-weight: 600;
+}
+
+.empty-published-content p {
+  color: #9ca3af;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+/* 已发布题目加载状态 */
+.loading-published-section {
+  margin-top: 2rem;
+  padding: 3rem 2rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  text-align: center;
+  border: 1px solid rgba(16, 163, 127, 0.1);
+  box-shadow: 0 4px 20px rgba(16, 163, 127, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.loading-published-content .loading-spinner {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  display: block;
+  animation: spin 1.5s linear infinite;
+}
+
+.loading-published-content p {
+  color: #6b7280;
+  font-size: 1.1rem;
+  margin: 0;
+  font-weight: 500;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* 文件选择弹窗 */
@@ -2111,6 +2467,28 @@ onMounted(() => {
   
   .correct-mark {
     align-self: flex-end;
+  }
+  
+  /* 讲座信息区域移动端适配 */
+  .lecture-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  
+  .lecture-status {
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  
+  .status-item {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  
+  .end-lecture-btn-compact {
+    width: 100%;
+    justify-content: center;
   }
   
   .file-selector-modal {

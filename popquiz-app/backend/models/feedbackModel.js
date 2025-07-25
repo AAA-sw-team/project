@@ -8,7 +8,9 @@ class FeedbackModel {
             VALUES (?, ?, ?, ?)
         `;
         try {
-            const result = await db.execute(query, [lectureId, userId, feedbackType, feedbackMessage]);
+            const [result] = await db.promise().execute(query, [lectureId, userId, feedbackType, feedbackMessage]);
+            console.log('Insert result:', result);
+            console.log('Insert ID:', result.insertId);
             return {
                 success: true,
                 feedbackId: result.insertId,
@@ -129,23 +131,25 @@ class FeedbackModel {
 
     // 检查用户是否可以提交反馈（防止垃圾反馈）
     static async canSubmitFeedback(lectureId, userId) {
-        // 检查用户是否已加入讲座
+        // 检查用户是否曾经加入过讲座（不检查状态，只要有记录即可）
         const participantQuery = `
             SELECT 1 FROM lecture_participants 
-            WHERE lecture_id = ? AND user_id = ? AND status = 'joined'
+            WHERE lecture_id = ? AND user_id = ?
         `;
-        const participant = await db.promise().execute(participantQuery, [lectureId, userId]);
+        const [participant] = await db.promise().execute(participantQuery, [lectureId, userId]);
         if (!participant || participant.length === 0) {
             return { canSubmit: false, reason: '您需要先加入讲座才能提交反馈' };
         }
-        // 检查讲座状态
+        // 检查讲座状态 - 允许进行中和已结束的讲座提交反馈
         const lectureQuery = `SELECT status FROM lectures WHERE id = ?`;
-        const lecture = await db.promise().execute(lectureQuery, [lectureId]);
+        const [lecture] = await db.promise().execute(lectureQuery, [lectureId]);
         if (!lecture || lecture.length === 0) {
             return { canSubmit: false, reason: '讲座不存在' };
         }
-        if (lecture[0].status !== 'active') {
-            return { canSubmit: false, reason: '只能在进行中的讲座提交反馈' };
+        
+        // 允许活跃(1)和已结束(2)的讲座提交反馈，但不允许未开始(0)的讲座
+        if (lecture[0].status === 0) {
+            return { canSubmit: false, reason: '讲座尚未开始，无法提交反馈' };
         }
         // 检查最近5分钟内是否已提交过多反馈（防止刷屏）
         const recentQuery = `
@@ -154,7 +158,7 @@ class FeedbackModel {
             WHERE lecture_id = ? AND user_id = ? 
             AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
         `;
-        const recent = await db.promise().execute(recentQuery, [lectureId, userId]);
+        const [recent] = await db.promise().execute(recentQuery, [lectureId, userId]);
         if (recent[0]?.count >= 3) {
             return { canSubmit: false, reason: '请不要频繁提交反馈，请等待5分钟后再试' };
         }

@@ -38,7 +38,8 @@
               <div class="user-info">
                 <span class="user-avatar">👤</span>
                 <span class="user-name">{{ comment.userName }}</span>
-                <span class="user-badge" v-if="comment.userName === speakerName">演讲者</span>
+                <span class="user-badge" v-if="isCurrentUserMessage(comment)">我</span>
+                <span class="user-badge speaker-badge" v-else-if="isSpeakerMessage(comment)">演讲者</span>
                 <span class="pinned-badge" v-if="comment.isPinned">📌置顶</span>
               </div>
               <span class="comment-time">{{ formatTime(comment.time) }}</span>
@@ -51,8 +52,8 @@
               <button v-if="(userRole === 'organizer' || userRole === 'speaker')" @click="togglePin(comment)" class="pin-btn">
                 {{ comment.isPinned ? '取消置顶' : '置顶' }}
               </button>
-              <button v-if="userRole === 'speaker'" @click="deleteComment(comment)" class="delete-btn">删除</button>
-              <button v-else-if="comment.userId === userId || userRole === 'organizer'" @click="deleteComment(comment)" class="delete-btn">删除</button>
+              <!-- 讲者和组织者可以删除任何消息，其他用户只能删除自己的消息 -->
+              <button v-if="userRole === 'speaker' || userRole === 'organizer' || isCurrentUserMessage(comment)" @click="deleteComment(comment)" class="delete-btn">删除</button>
             </div>
           </div>
         </div>
@@ -93,23 +94,42 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 
+interface Comment {
+  id: string | number
+  userName: string
+  text: string
+  time: Date
+  likeCount: number
+  isLikedByUser: boolean
+  isPinned: boolean
+  userId: string | number
+  userRole: string
+}
+
 const route = useRoute()
 const lectureId = route.params.id
 
-const comments = ref([])
+const comments = ref<Comment[]>([])
 const loading = ref(true)
 const speakerName = '演讲者本人'
 const userId = ref(null)
 const userRole = ref('')
+const currentUser = ref<any>(null)
 
 // 获取评论列表
 const fetchComments = async () => {
   loading.value = true
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    console.log('获取讨论列表 - 讲座ID:', lectureId)
+    console.log('Token存在:', !!token)
+    
     const res = await axios.get(`/api/discussion/lecture/${lectureId}/messages`, {
       headers: { Authorization: `Bearer ${token}` }
     })
+    
+    console.log('讨论列表响应:', res.data)
+    
     if (res.data && res.data.success && res.data.data && res.data.data.messages) {
       comments.value = res.data.data.messages.map(item => ({
         id: item.id,
@@ -122,10 +142,14 @@ const fetchComments = async () => {
         userId: item.user_id,
         userRole: item.user_role
       }))
+      console.log('处理后的讨论数据:', comments.value)
     } else {
       comments.value = []
+      console.log('未获取到讨论数据或格式不正确')
     }
   } catch (e) {
+    console.error('获取讨论列表失败:', e)
+    console.error('错误详情:', e.response?.data)
     comments.value = []
   }
   loading.value = false
@@ -136,18 +160,30 @@ const newComment = ref({ text: '' })
 const submitComment = async () => {
   if (!newComment.value.text.trim()) return
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    console.log('提交讨论 - 讲座ID:', lectureId)
+    console.log('讨论内容:', newComment.value.text)
+    console.log('Token存在:', !!token)
+    
     const res = await axios.post(`/api/discussion/lecture/${lectureId}/message`, {
       message: newComment.value.text
     }, {
       headers: { Authorization: `Bearer ${token}` }
     })
+    
+    console.log('提交讨论响应:', res.data)
+    
     if (res.data && res.data.success) {
       // 重新拉取评论列表，或可直接push新评论
+      console.log('讨论提交成功，重新加载评论列表')
       await fetchComments()
       newComment.value.text = ''
+    } else {
+      console.error('讨论提交失败:', res.data)
     }
   } catch (e) {
+    console.error('提交讨论出错:', e)
+    console.error('错误详情:', e.response?.data)
     // 可加错误提示
   }
 }
@@ -155,7 +191,7 @@ const submitComment = async () => {
 // 点赞/取消点赞
 const toggleLike = async (comment) => {
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
     const res = await axios.post(`/api/discussion/message/${comment.id}/like`, {}, {
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -168,7 +204,7 @@ const toggleLike = async (comment) => {
 // 置顶/取消置顶（仅讲师）
 const togglePin = async (comment) => {
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
     const res = await axios.post(`/api/discussion/lecture/${lectureId}/message/${comment.id}/pin`, {}, {
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -182,7 +218,7 @@ const togglePin = async (comment) => {
 const deleteComment = async (comment) => {
   if (!confirm('确定要删除这条消息吗？')) return
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
     const res = await axios.delete(`/api/discussion/lecture/${lectureId}/message/${comment.id}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -197,7 +233,7 @@ const announcementText = ref('')
 const sendAnnouncement = async () => {
   if (!announcementText.value.trim()) return
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
     const res = await axios.post(`/api/discussion/lecture/${lectureId}/announcement`, {
       message: announcementText.value
     }, {
@@ -222,11 +258,43 @@ const formatTime = (time: Date) => {
   return time.toLocaleDateString('zh-CN')
 }
 
+// 获取当前用户信息
+const getCurrentUser = () => {
+  try {
+    const userData = localStorage.getItem('user') || sessionStorage.getItem('user')
+    if (userData) {
+      return JSON.parse(userData)
+    }
+    return null
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+    return null
+  }
+}
+
+// 检查是否是当前用户的消息
+const isCurrentUserMessage = (comment: Comment) => {
+  return currentUser.value && comment.userId === currentUser.value.id
+}
+
+// 检查是否是演讲者的消息
+const isSpeakerMessage = (comment: Comment) => {
+  // 可以通过用户角色或者用户名来判断
+  return comment.userRole === 'speaker' || comment.userName === speakerName
+}
+
 onMounted(() => {
-  // 获取用户信息（假设token中有，或从后端接口获取）
-  const userInfo = JSON.parse(localStorage.getItem('user') || '{}')
-  userId.value = userInfo.userId
-  userRole.value = userInfo.role
+  // 获取用户信息（从sessionStorage获取）
+  const userRole_stored = sessionStorage.getItem('userRole') || localStorage.getItem('userRole')
+  const username_stored = sessionStorage.getItem('username') || localStorage.getItem('username')
+  
+  userRole.value = userRole_stored || ''
+  currentUser.value = getCurrentUser()
+  // 这里我们暂时没有userId，可以从token解析或后端获取
+  console.log('用户角色:', userRole.value)
+  console.log('用户名:', username_stored)
+  console.log('当前用户信息:', currentUser.value)
+  
   fetchComments()
 })
 </script>
@@ -479,12 +547,17 @@ onMounted(() => {
 }
 
 .user-badge {
-  background: linear-gradient(135deg, #10a37f 0%, #059669 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
   color: white;
   padding: 0.1rem 0.5rem;
   border-radius: 8px;
   font-size: 0.7rem;
   font-weight: 600;
+}
+
+.user-badge.speaker-badge {
+  background: linear-gradient(135deg, #10a37f 0%, #059669 100%);
+  color: white;
 }
 
 .comment-time {

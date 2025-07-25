@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>认证调试</title>
+</head>
+<body>
+    <h1>认证状态调试</h1>
+    <div id="debug-info"></div>
+    
+    <script>
+        function checkAuth() {
+            const debugDiv = document.getElementById('debug-info');
+            let info = '<h2>认证信息:</h2>';
+            
+            // 检查localStorage
+            info += '<h3>localStorage:</h3>';
+            info += `<p>token: ${localStorage.getItem('token') || '无'}</p>`;
+            info += `<p>authToken: ${localStorage.getItem('authToken') || '无'}</p>`;
+            info += `<p>user: ${localStorage.getItem('user') || '无'}</p>`;
+            info += `<p>currentLectureId: ${localStorage.getItem('currentLectureId') || '无'}</p>`;
+            
+            // 检查sessionStorage
+            info += '<h3>sessionStorage:</h3>';
+            info += `<p>token: ${sessionStorage.getItem('token') || '无'}</p>`;
+            info += `<p>authToken: ${sessionStorage.getItem('authToken') || '无'}</p>`;
+            info += `<p>user: ${sessionStorage.getItem('user') || '无'}</p>`;
+            
+            // 尝试解析token
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token') || localStorage.getItem('authToken');
+            if (token) {
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    info += '<h3>Token内容:</h3>';
+                    info += `<pre>${JSON.stringify(payload, null, 2)}</pre>`;
+                    
+                    info += '<h3>Token是否过期:</h3>';
+                    const now = Date.now() / 1000;
+                    info += `<p>当前时间: ${now}</p>`;
+                    info += `<p>过期时间: ${payload.exp}</p>`;
+                    info += `<p>是否过期: ${payload.exp < now ? '是' : '否'}</p>`;
+                } catch (e) {
+                    info += `<p>Token解析失败: ${e.message}</p>`;
+                }
+            }
+            
+            debugDiv.innerHTML = info;
+        }
+        
+        // 页面加载时检查
+        window.onload = checkAuth;
+        
+        // 添加刷新按钮
+        const refreshBtn = document.createElement('button');
+        refreshBtn.textContent = '刷新信息';
+        refreshBtn.onclick = checkAuth;
+        document.body.appendChild(refreshBtn);
+        
+        // 测试API请求
+        const testApiBtn = document.createElement('button');
+        testApiBtn.textContent = '测试API请求';
+        testApiBtn.onclick = async function() {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token') || localStorage.getItem('authToken');
+            const lectureId = localStorage.getItem('currentLectureId') || '1';
+            
+            if (!token) {
+                alert('没有找到token');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/answers/lecture/${lectureId}/stats`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const result = await response.json();
+                console.log('API响应:', result);
+                alert(`API请求结果: ${response.status} - ${JSON.stringify(result)}`);
+            } catch (error) {
+                console.error('API请求失败:', error);
+                alert(`API请求失败: ${error.message}`);
+            }
+        };
+        document.body.appendChild(testApiBtn);
+    </script>
+</body>
+</html>

@@ -1,6 +1,5 @@
 const { generateQuizFromText } = require('../utils/deepseek');
 const fileReader = require('../utils/fileReader');
-const { v4: uuidv4 } = require('uuid');
 const quizModel = require('../models/quizzes');
 const fileModel = require('../models/fileModel');
 
@@ -38,27 +37,19 @@ const generateQuiz = async (req, res) => {
     if (!allText) {
       return res.status(400).json({ error: '所选文件和录音内容均为空或解析失败' });
     }
-    const quizzes = await generateQuizFromText(allText, count);
-    const group_id = uuidv4();
+    const quizzes = await generateQuizFromText(allText);
+    
+    // 获取下一个组号（每个讲座从1开始）
+    const group_id = await quizModel.getNextGroupId(lectureId);
     const quizIds = [];
     
-    console.log('AI生成的原始题目数据:', quizzes);
+    console.log(`AI生成的原始题目数据: ${quizzes.length}道题目，分配到第${group_id}组`);
     
     for (const q of quizzes) {
-      // 改进正确答案处理逻辑
-      let correctOption = 'A'; // 默认值
-      if (q.correct_option) {
-        const option = q.correct_option.toString().trim().toUpperCase();
-        const match = option.match(/[ABCD]/);
-        if (match) {
-          correctOption = match[0];
-        }
-      }
-      
+      // deepseek.js 已经处理并验证了正确答案，这里直接使用
       console.log('处理题目:', {
         question: q.question,
-        original_correct: q.correct_option,
-        processed_correct: correctOption,
+        correct_option: q.correct_option,
         options: [q.option_a, q.option_b, q.option_c, q.option_d]
       });
       
@@ -66,15 +57,42 @@ const generateQuiz = async (req, res) => {
         lectureId,
         question: q.question,
         options: [q.option_a, q.option_b, q.option_c, q.option_d],
-        correctOption,
-        group_id,
+        correctOption: q.correct_option, // 直接使用已验证的正确答案
+        group_id: group_id.toString(), // 转换为字符串存储
         source_file_ids: sourceFileIds
       });
       quizIds.push(quizId);
     }
-    res.status(200).json({ message: 'Quiz 生成成功', data: quizzes, quizIds, group_id });
+    res.status(200).json({ 
+      message: 'Quiz 生成成功', 
+      data: quizzes, 
+      quizIds, 
+      group_id: group_id.toString(),
+      info: `成功生成 ${quizzes.length} 道题目，分配到第 ${group_id} 组`
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Quiz 生成失败', detail: error.message });
+    console.error('Quiz生成错误:', error);
+    
+    // 提供更详细的错误信息给前端
+    let errorMessage = 'Quiz 生成失败';
+    let errorDetail = error.message;
+    
+    if (error.message.includes('经过') && error.message.includes('次尝试')) {
+      errorMessage = 'AI题目生成多次尝试后失败';
+      errorDetail = '请检查讲座内容是否充足，或稍后重试';
+    } else if (error.message.includes('正确答案无效')) {
+      errorMessage = 'AI生成的题目格式有问题';
+      errorDetail = '系统已自动重试，如仍失败请重新生成';
+    } else if (error.message.includes('JSON')) {
+      errorMessage = 'AI返回格式错误';
+      errorDetail = '请重试，如问题持续存在请联系管理员';
+    }
+    
+    res.status(500).json({ 
+      error: errorMessage, 
+      detail: errorDetail,
+      timestamp: new Date().toISOString()
+    });
   }
 };
 
@@ -102,6 +120,44 @@ const getQuizzes = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to get quizzes' });
+  }
+};
+
+// 获取某讲座的所有组号
+const getGroupIds = async (req, res) => {
+  const lectureId = req.params.lectureId;
+  try {
+    const groupIds = await quizModel.getGroupIds(lectureId);
+    res.json({ 
+      success: true, 
+      data: groupIds,
+      count: groupIds.length,
+      message: `找到 ${groupIds.length} 个题目组`
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to get group IDs' });
+  }
+};
+
+// 获取某讲座的已发布题目
+const getPublishedQuizzes = async (req, res) => {
+  const lectureId = req.params.lectureId;
+  try {
+    const quizzes = await quizModel.getPublishedQuizzes(lectureId);
+    res.json({ 
+      success: true, 
+      data: { quizzes },
+      count: quizzes.length,
+      message: `找到 ${quizzes.length} 道已发布题目`
+    });
+  } catch (err) {
+    console.error('获取已发布题目失败:', err);
+    res.status(500).json({ 
+      success: false,
+      error: '获取已发布题目失败', 
+      detail: err.message 
+    });
   }
 };
 
@@ -143,27 +199,19 @@ const RegenerateQuiz = async (req, res) => {
     if (!allText) {
       return res.status(400).json({ error: '所选文件和录音内容均为空或解析失败' });
     }
-    const quizzes = await generateQuizFromText(allText, count);
-    const new_group_id = uuidv4();
+    const quizzes = await generateQuizFromText(allText);
+    
+    // 获取下一个组号（每个讲座从1开始）
+    const new_group_id = await quizModel.getNextGroupId(lectureId);
     const quizIds = [];
     
-    console.log('AI重新生成的原始题目数据:', quizzes);
+    console.log(`AI重新生成的原始题目数据: ${quizzes.length}道题目，分配到第${new_group_id}组`);
     
     for (const q of quizzes) {
-      // 改进正确答案处理逻辑
-      let correctOption = 'A'; // 默认值
-      if (q.correct_option) {
-        const option = q.correct_option.toString().trim().toUpperCase();
-        const match = option.match(/[ABCD]/);
-        if (match) {
-          correctOption = match[0];
-        }
-      }
-      
+      // deepseek.js 已经处理并验证了正确答案，这里直接使用
       console.log('重新生成处理题目:', {
         question: q.question,
-        original_correct: q.correct_option,
-        processed_correct: correctOption,
+        correct_option: q.correct_option,
         options: [q.option_a, q.option_b, q.option_c, q.option_d]
       });
       
@@ -171,15 +219,42 @@ const RegenerateQuiz = async (req, res) => {
         lectureId,
         question: q.question,
         options: [q.option_a, q.option_b, q.option_c, q.option_d],
-        correctOption,
-        group_id: new_group_id,
+        correctOption: q.correct_option, // 直接使用已验证的正确答案
+        group_id: new_group_id.toString(), // 转换为字符串存储
         source_file_ids: sourceFileIds
       });
       quizIds.push(quizId);
     }
-    res.status(200).json({ message: '题目重新生成成功', data: quizzes, quizIds, group_id: new_group_id });
+    res.status(200).json({ 
+      message: '题目重新生成成功', 
+      data: quizzes, 
+      quizIds, 
+      group_id: new_group_id.toString(),
+      info: `成功重新生成 ${quizzes.length} 道题目，分配到第 ${new_group_id} 组`
+    });
   } catch (error) {
-    res.status(500).json({ error: '题目重新生成失败', detail: error.message });
+    console.error('题目重新生成错误:', error);
+    
+    // 提供更详细的错误信息给前端
+    let errorMessage = '题目重新生成失败';
+    let errorDetail = error.message;
+    
+    if (error.message.includes('经过') && error.message.includes('次尝试')) {
+      errorMessage = 'AI题目重新生成多次尝试后失败';
+      errorDetail = '请检查讲座内容是否充足，或稍后重试';
+    } else if (error.message.includes('正确答案无效')) {
+      errorMessage = 'AI重新生成的题目格式有问题';
+      errorDetail = '系统已自动重试，如仍失败请重新生成';
+    } else if (error.message.includes('JSON')) {
+      errorMessage = 'AI返回格式错误';
+      errorDetail = '请重试，如问题持续存在请联系管理员';
+    }
+    
+    res.status(500).json({ 
+      error: errorMessage, 
+      detail: errorDetail,
+      timestamp: new Date().toISOString()
+    });
   }
 };
 
@@ -197,6 +272,8 @@ const deleteQuiz = async (req, res) => {
 module.exports = {
   generateQuiz,
   getQuizzes,
+  getGroupIds,
+  getPublishedQuizzes,
   publishQuizzes,
   RegenerateQuiz,
   deleteQuiz

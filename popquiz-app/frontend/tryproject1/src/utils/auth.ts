@@ -5,34 +5,24 @@ export class AuthManager {
   private static readonly TOKEN_KEY = 'token'
   private static readonly USE_SESSION_STORAGE = true // 设置为true使用sessionStorage，false使用localStorage
 
-  // 获取token
+  // 获取token - 支持双存储后备
   static getToken(): string | null {
-    if (this.USE_SESSION_STORAGE) {
-      return sessionStorage.getItem(this.TOKEN_KEY)
-    } else {
-      return localStorage.getItem(this.TOKEN_KEY)
-    }
+    return localStorage.getItem(this.TOKEN_KEY) || sessionStorage.getItem(this.TOKEN_KEY)
   }
 
-  // 设置token
+  // 设置token - 同时存储到两个地方以确保可靠性
   static setToken(token: string): void {
-    if (this.USE_SESSION_STORAGE) {
-      sessionStorage.setItem(this.TOKEN_KEY, token)
-    } else {
-      localStorage.setItem(this.TOKEN_KEY, token)
-    }
+    localStorage.setItem(this.TOKEN_KEY, token)
+    sessionStorage.setItem(this.TOKEN_KEY, token)
   }
 
-  // 移除token
+  // 移除token - 从两个存储中都移除
   static removeToken(): void {
-    if (this.USE_SESSION_STORAGE) {
-      sessionStorage.removeItem(this.TOKEN_KEY)
-    } else {
-      localStorage.removeItem(this.TOKEN_KEY)
-    }
+    localStorage.removeItem(this.TOKEN_KEY)
+    sessionStorage.removeItem(this.TOKEN_KEY)
   }
 
-  // 清除所有认证相关数据
+  // 清除所有认证相关数据 - 从两个存储中都清除
   static clearAuth(): void {
     // 清除token
     sessionStorage.removeItem(this.TOKEN_KEY)
@@ -43,8 +33,12 @@ export class AuthManager {
     localStorage.removeItem('currentLectureId')
     localStorage.removeItem('currentLecture')
     
-    // 清除session数据
-    sessionStorage.clear()
+    // 也清除 sessionStorage 中对应的数据
+    sessionStorage.removeItem('authToken')
+    sessionStorage.removeItem('user')
+    sessionStorage.removeItem('userRole')
+    sessionStorage.removeItem('currentLectureId')
+    sessionStorage.removeItem('currentLecture')
   }
 
   // 检查是否已登录
@@ -55,9 +49,18 @@ export class AuthManager {
     try {
       // 检查token是否有效（简单的格式检查）
       const payload = JSON.parse(atob(token.split('.')[1]))
+      const isExpired = payload.exp && payload.exp < Date.now() / 1000
+      
+      if (isExpired) {
+        console.warn('Token已过期，自动清除')
+        this.clearAuth()
+        return false
+      }
+      
       return payload && payload.exp > Date.now() / 1000
     } catch (e) {
       // token无效，清除它
+      console.warn('Token格式无效，自动清除')
       this.removeToken()
       return false
     }

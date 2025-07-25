@@ -83,21 +83,44 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 
+interface Feedback {
+  id: string | number
+  userName: string
+  text: string
+  rating: number
+  type: string
+  time: Date
+  tags: string[]
+}
+
+interface Stats {
+  total: number
+  positive: number
+  average: number
+}
+
 const route = useRoute()
 const lectureId = route.params.id
 
-const feedbacks = ref([])
-const stats = ref({ total: 0, positive: 0, average: 0 })
+const feedbacks = ref<Feedback[]>([])
+const stats = ref<Stats>({ total: 0, positive: 0, average: 0 })
 const loading = ref(true)
 
 const fetchFeedbacks = async () => {
   loading.value = true
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    console.log('获取反馈列表 - 讲座ID:', lectureId)
+    console.log('Token存在:', !!token)
+    console.log('Token来源:', localStorage.getItem('token') ? 'localStorage' : 'sessionStorage')
+    
     // 获取反馈列表
     const res = await axios.get(`/api/feedback/lecture/${lectureId}/all`, {
       headers: { Authorization: `Bearer ${token}` }
     })
+    
+    console.log('反馈API响应:', res.data)
+    
     if (res.data && res.data.success && res.data.data && res.data.data.feedbacks) {
       feedbacks.value = res.data.data.feedbacks.map(item => ({
         id: item.id,
@@ -108,10 +131,14 @@ const fetchFeedbacks = async () => {
         time: new Date(item.created_at),
         tags: [] // 后端无tags
       }))
+      console.log('处理后的反馈数据:', feedbacks.value)
     } else {
       feedbacks.value = []
+      console.log('未获取到反馈数据或格式不正确')
     }
   } catch (e) {
+    console.error('获取反馈失败:', e)
+    console.error('错误详情:', e.response?.data)
     feedbacks.value = []
   }
   loading.value = false
@@ -119,20 +146,29 @@ const fetchFeedbacks = async () => {
 
 const fetchStats = async () => {
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    console.log('获取反馈统计 - 讲座ID:', lectureId)
+    
     const res = await axios.get(`/api/feedback/lecture/${lectureId}/stats`, {
       headers: { Authorization: `Bearer ${token}` }
     })
+    
+    console.log('统计API响应:', res.data)
+    
     if (res.data && res.data.success && res.data.data) {
       const statArr = res.data.data.stats || []
       const total = res.data.data.totalCount || 0
       const positive = statArr.find(s => s.feedback_type === 'good')?.count || 0
-      const average = total > 0 ? (positive * 5 / total).toFixed(1) : '0.0'
+      const average = total > 0 ? parseFloat((positive * 5 / total).toFixed(1)) : 0
       stats.value = { total, positive, average }
+      console.log('处理后的统计数据:', stats.value)
     } else {
       stats.value = { total: 0, positive: 0, average: 0 }
+      console.log('未获取到统计数据或格式不正确')
     }
   } catch (e) {
+    console.error('获取统计失败:', e)
+    console.error('错误详情:', e.response?.data)
     stats.value = { total: 0, positive: 0, average: 0 }
   }
 }

@@ -1,10 +1,10 @@
 <template>
   <div class="lecture-layout">
     <aside class="sidebar">
-      <router-link :to="`/listener/lecture/${lectureId}/quiz`" :class="{active: isActive('quiz')}">答题</router-link>
-      <router-link :to="`/listener/lecture/${lectureId}/score`" :class="{active: isActive('score')}">成绩查询</router-link>
-      <router-link :to="`/listener/lecture/${lectureId}/discussion`" :class="{active: isActive('discussion')}">讨论</router-link>
-      <router-link :to="`/listener/lecture/${lectureId}/feedback`" :class="{active: isActive('feedback')}">反馈</router-link>
+      <router-link :to="`/listener/lecture/${lectureId}/quiz`" :class="{active: isActive('quiz')}">答题测验</router-link>
+      <router-link :to="`/listener/lecture/${lectureId}/score`" :class="{active: isActive('score')}">成绩报告</router-link>
+      <router-link :to="`/listener/lecture/${lectureId}/discussion`" :class="{active: isActive('discussion')}">互动讨论</router-link>
+      <router-link :to="`/listener/lecture/${lectureId}/feedback`" :class="{active: isActive('feedback')}">进行反馈</router-link>
     </aside>
     <main class="content">
       <div class="content-card">

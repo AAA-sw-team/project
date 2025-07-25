@@ -24,4 +24,8 @@ router.delete('/:quizId', authMiddleware, quizController.deleteQuiz);
 // GET /api/quizzes/:lectureId
 router.get('/:lectureId', quizController.getQuizzes);
 
+// 获取某讲座的所有组号
+// GET /api/quizzes/:lectureId/groups
+router.get('/:lectureId/groups', quizController.getGroupIds);
+
 module.exports = router;
