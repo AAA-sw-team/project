@@ -319,7 +319,7 @@ const loadData = async () => {
   } catch (error) {
     console.error('加载数据失败:', error)
     // 如果API调用失败，使用模拟数据
-    lecture.value = getMockData()
+    // lecture.value = getMockData()
   }
   loading.value = false
 }

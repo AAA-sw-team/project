@@ -7,9 +7,8 @@ class FeedbackModel {
             INSERT INTO lecture_feedback (lecture_id, user_id, feedback_type, feedback_message)
             VALUES (?, ?, ?, ?)
         `;
-        
         try {
-            const [result] = await db.execute(query, [lectureId, userId, feedbackType, feedbackMessage]);
+            const result = await db.execute(query, [lectureId, userId, feedbackType, feedbackMessage]);
             return {
                 success: true,
                 feedbackId: result.insertId,
@@ -24,36 +23,35 @@ class FeedbackModel {
     // 获取讲座的所有反馈（讲师用）
     static async getLectureFeedback(lectureId, page = 1, limit = 50) {
         const offset = (page - 1) * limit;
-        
         const query = `
             SELECT 
                 lf.id,
                 lf.feedback_type,
                 lf.feedback_message,
                 lf.created_at,
-                u.username,
-                u.email
+                u.username
             FROM lecture_feedback lf
             JOIN users u ON lf.user_id = u.id
             WHERE lf.lecture_id = ?
             ORDER BY lf.created_at DESC
-            LIMIT ? OFFSET ?
+            LIMIT ${Number(limit)} OFFSET ${Number(offset)}
         `;
-        
         try {
-            const [feedbacks] = await db.execute(query, [lectureId, limit, offset]);
-            
+            const [feedbacks] = await db.promise().execute(query, [lectureId]);
             // 获取总数
             const countQuery = `SELECT COUNT(*) as total FROM lecture_feedback WHERE lecture_id = ?`;
-            const [countResult] = await db.execute(countQuery, [lectureId]);
-            
+            const [countResult] = await db.promise().execute(countQuery, [lectureId]);
+            let total = 0;
+            if (Array.isArray(countResult) && countResult.length > 0 && countResult[0] && typeof countResult[0].total !== 'undefined') {
+                total = countResult[0].total;
+            }
             return {
                 feedbacks,
                 pagination: {
                     page,
                     limit,
-                    total: countResult[0].total,
-                    totalPages: Math.ceil(countResult[0].total / limit)
+                    total,
+                    totalPages: Math.ceil(total / limit)
                 }
             };
         } catch (error) {
@@ -74,10 +72,8 @@ class FeedbackModel {
             GROUP BY feedback_type
             ORDER BY count DESC
         `;
-        
         try {
-            const [stats] = await db.execute(query, [lectureId, lectureId]);
-            
+            const [stats] = await db.promise().execute(query, [lectureId, lectureId]);
             // 获取最近的反馈
             const recentQuery = `
                 SELECT 
@@ -91,16 +87,18 @@ class FeedbackModel {
                 ORDER BY lf.created_at DESC
                 LIMIT 10
             `;
-            const [recentFeedback] = await db.execute(recentQuery, [lectureId]);
-            
+            const [recentFeedback] = await db.promise().execute(recentQuery, [lectureId]);
             // 获取总反馈数
             const totalQuery = `SELECT COUNT(*) as total FROM lecture_feedback WHERE lecture_id = ?`;
-            const [totalResult] = await db.execute(totalQuery, [lectureId]);
-            
+            const [totalResult] = await db.promise().execute(totalQuery, [lectureId]);
+            let totalCount = 0;
+            if (Array.isArray(totalResult) && totalResult.length > 0 && totalResult[0] && typeof totalResult[0].total !== 'undefined') {
+                totalCount = totalResult[0].total;
+            }
             return {
                 stats,
                 recentFeedback,
-                totalCount: totalResult[0].total
+                totalCount
             };
         } catch (error) {
             console.error('获取反馈统计失败:', error);
@@ -120,9 +118,8 @@ class FeedbackModel {
             WHERE lecture_id = ? AND user_id = ?
             ORDER BY created_at DESC
         `;
-        
         try {
-            const [history] = await db.execute(query, [lectureId, userId]);
+            const [history] = await db.promise().execute(query, [lectureId, userId]);
             return history;
         } catch (error) {
             console.error('获取用户反馈历史失败:', error);
@@ -137,24 +134,19 @@ class FeedbackModel {
             SELECT 1 FROM lecture_participants 
             WHERE lecture_id = ? AND user_id = ? AND status = 'joined'
         `;
-        const [participant] = await db.execute(participantQuery, [lectureId, userId]);
-        
-        if (participant.length === 0) {
+        const participant = await db.promise().execute(participantQuery, [lectureId, userId]);
+        if (!participant || participant.length === 0) {
             return { canSubmit: false, reason: '您需要先加入讲座才能提交反馈' };
         }
-
         // 检查讲座状态
         const lectureQuery = `SELECT status FROM lectures WHERE id = ?`;
-        const [lecture] = await db.execute(lectureQuery, [lectureId]);
-        
-        if (lecture.length === 0) {
+        const lecture = await db.promise().execute(lectureQuery, [lectureId]);
+        if (!lecture || lecture.length === 0) {
             return { canSubmit: false, reason: '讲座不存在' };
         }
-
         if (lecture[0].status !== 'active') {
             return { canSubmit: false, reason: '只能在进行中的讲座提交反馈' };
         }
-
         // 检查最近5分钟内是否已提交过多反馈（防止刷屏）
         const recentQuery = `
             SELECT COUNT(*) as count 
@@ -162,12 +154,10 @@ class FeedbackModel {
             WHERE lecture_id = ? AND user_id = ? 
             AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
         `;
-        const [recent] = await db.execute(recentQuery, [lectureId, userId]);
-        
-        if (recent[0].count >= 3) {
+        const recent = await db.promise().execute(recentQuery, [lectureId, userId]);
+        if (recent[0]?.count >= 3) {
             return { canSubmit: false, reason: '请不要频繁提交反馈，请等待5分钟后再试' };
         }
-
         return { canSubmit: true };
     }
 

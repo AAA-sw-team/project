@@ -254,9 +254,14 @@ const handleLogin = async () => {
     if (res.data.message === '登录成功' && res.data.token) {
       // 登录成功
       localStorage.setItem('token', res.data.token)
-      localStorage.setItem('userRole', res.data.role || role.value)
-      localStorage.setItem('username', username.value)
-      localStorage.setItem('nickname', res.data.nickname || username.value)
+      // 存储完整用户信息，便于后续页面统一获取
+      const userObj = {
+        userId: res.data.userId || res.data.id,
+        role: res.data.role || role.value,
+        username: res.data.username || username.value,
+        nickname: res.data.nickname || username.value
+      }
+      localStorage.setItem('user', JSON.stringify(userObj))
       
       const roleText = role.value === 'listener' ? '听众' : 
                       role.value === 'speaker' ? '演讲者' : '组织者'
