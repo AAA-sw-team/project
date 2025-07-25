@@ -34,19 +34,31 @@
                   </div>
                   <div class="lecture-item">
                     <span class="item-icon">🕒</span>
-                    <span class="item-label">时间：</span>
-                    <span class="item-value">{{ formatLectureTimePanel(getCurrentLecture()) }}</span>
+                    <span class="item-label">创建：</span>
+                    <span class="item-value">{{ formatLectureTime() }}</span>
                   </div>
                   <div class="lecture-item">
                     <span class="item-icon">👥</span>
                     <span class="item-label">参与：</span>
-                    <span class="item-value">{{ getCurrentLecture().participants !== undefined ? getCurrentLecture().participants : '无' }}</span>
+                    <span class="item-value">
+                      {{ getCurrentLecture().participants }} 人参与
+                      <span v-if="getCurrentLecture().onlineParticipants !== undefined" class="online-indicator">
+                        ({{ getCurrentLecture().onlineParticipants }} 在线)
+                      </span>
+                    </span>
                   </div>
                   <div class="lecture-item">
                     <span class="item-icon">📝</span>
                     <span class="item-label">描述：</span>
                     <span class="item-value">{{ getCurrentLecture().description || '无' }}</span>
                   </div>
+                </div>
+                <!-- 离开讲座按钮（仅听众可用） -->
+                <div class="lecture-actions" v-if="getUserRole() === 'listener'">
+                  <button class="leave-lecture-btn" @click="handleLeaveLecture">
+                    <span class="btn-icon">🚪</span>
+                    <span class="btn-text">离开讲座</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -112,6 +124,9 @@ const router = useRouter()
 // 设置下拉菜单状态
 const showSettingsDropdown = ref(false)
 const showLectureInfo = ref(false)
+const currentLectureData = ref(null) // 新增：存储当前讲座数据
+const participantCountTimer = ref(null) // 新增：参与者数量定时器
+const heartbeatTimer = ref(null) // 新增：心跳定时器
 
 const isLectureLayout = computed(() => 
   route.path.startsWith('/speaker/lecture/') || route.path.startsWith('/listener/lecture/')
@@ -197,39 +212,32 @@ const handleAccountSettings = () => {
 }
 
 // 生命周期钩子
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('click', handleClickOutside)
-  updateCurrentLecture() // 初始化当前讲座信息
-  setupHistoryGuard() // 设置历史记录守卫
+  await updateCurrentLecture() // 初始化当前讲座信息
+  setupHistoryGuard() // 立即设置历史记录守卫，无论用户是否登录
+  startParticipantCountRefresh() // 开始定时刷新参与者数量
+  startHeartbeat() // 开始心跳
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
   removeHistoryGuard() // 移除历史记录守卫
+  stopParticipantCountRefresh() // 停止定时刷新
+  stopHeartbeat() // 停止心跳
 })
 
 // 监听路由变化，更新当前讲座信息
-watch(route, () => {
-  updateCurrentLecture()
-  
-  // 在路由变化后重新设置历史记录保护
-  const userRole = getUserRole()
-  if (userRole && historyGuardEnabled) {
+watch(route, async () => {
+  await updateCurrentLecture()
+  // 每次路由变化时重新添加历史记录条目以防止回退
+  if (historyGuardEnabled) {
     setTimeout(() => {
-      const currentPath = route.path
-      if (currentPath !== '/login' && currentPath !== '/register') {
-        // 为新页面添加历史记录保护
-        for (let i = 0; i < 3; i++) {
-          history.pushState({ 
-            preventBack: true, 
-            originalPath: currentPath,
-            timestamp: Date.now(),
-            routeIndex: i
-          }, '', currentPath)
-        }
-      }
-    }, 50)
+      history.pushState(null, null, location.href)
+    }, 0)
   }
+  // 路由变化时重新启动定时器
+  restartTimers()
 })
 
 // 历史记录守卫相关
@@ -237,94 +245,56 @@ let historyGuardEnabled = false
 
 // 设置历史记录守卫
 const setupHistoryGuard = () => {
-  const userRole = getUserRole()
-  if (!userRole) return
-  
   historyGuardEnabled = true
   
   // 监听浏览器的 popstate 事件（后退/前进按钮）
   window.addEventListener('popstate', handleBrowserNavigation)
   
-  // 在历史记录中添加多个虚拟状态，使后退按钮无效
-  const currentPath = route.path
-  if (currentPath !== '/login' && currentPath !== '/register') {
-    // 清除可能存在的导航标记
-    sessionStorage.removeItem('homeButtonClicked')
-    
-    // 添加多个历史记录状态，确保后退按钮无法生效
-    setTimeout(() => {
-      // 添加多个相同的状态，使后退按钮失效
-      for (let i = 0; i < 5; i++) {
-        history.pushState({ 
-          preventBack: true, 
-          originalPath: currentPath,
-          timestamp: Date.now(),
-          index: i
-        }, '', currentPath)
-      }
-    }, 100)
-  }
+  // 监听 beforeunload 事件作为额外保护
+  window.addEventListener('beforeunload', handleBeforeUnload)
+  
+  // 添加历史记录条目以防止回退
+  history.pushState(null, null, location.href)
+  
+  // 清除可能存在的导航标记
+  sessionStorage.removeItem('homeButtonClicked')
 }
 
 // 移除历史记录守卫
 const removeHistoryGuard = () => {
   historyGuardEnabled = false
   window.removeEventListener('popstate', handleBrowserNavigation)
+  window.removeEventListener('beforeunload', handleBeforeUnload)
 }
 
 // 处理浏览器导航（后退/前进按钮）
 const handleBrowserNavigation = (event) => {
   if (!historyGuardEnabled) return
   
-  const userRole = getUserRole()
-  if (!userRole) return
+  // 完全禁用浏览器回退按钮
+  event.preventDefault()
+  event.stopPropagation()
   
-  const currentPath = route.path
-  const targetPath = location.pathname
+  // 强制保持在当前页面
+  history.pushState(null, null, location.href)
   
-  // 防止后退到登录页面或注册页面
-  if (targetPath === '/login' || targetPath === '/register' || targetPath === '/') {
-    // 立即重新推送当前页面到历史记录，静默阻止导航
-    setTimeout(() => {
-      history.pushState({ preventBack: true, originalPath: currentPath }, '', currentPath)
-      router.replace(currentPath)
-    }, 0)
-    return
-  }
+  // 提示用户使用页面内的导航
+  console.log('浏览器回退已被禁用，请使用页面内的导航按钮')
+}
+
+// 处理页面卸载前事件
+const handleBeforeUnload = (event) => {
+  if (!historyGuardEnabled) return
   
-  // 如果用户试图通过浏览器后退按钮回到首页，静默拦截
-  const homePages = ['/speaker/home', '/listener/home']
-  if (homePages.includes(targetPath)) {
-    // 检查是否是通过首页按钮的合法导航
-    const isLegitimateNavigation = event.state?.allowNavigation || sessionStorage.getItem('homeButtonClicked')
-    
-    if (!isLegitimateNavigation) {
-      // 立即重新推送当前页面到历史记录，静默阻止导航
-      setTimeout(() => {
-        history.pushState({ preventBack: true, originalPath: currentPath }, '', currentPath)
-        router.replace(currentPath)
-      }, 0)
-      return
-    } else {
-      // 清除合法导航标记
-      sessionStorage.removeItem('homeButtonClicked')
-    }
-  }
-  
-  // 对于其他页面间的导航，也进行静默拦截以防止意外退出讲座
-  if (currentPath.includes('/lecture/') && !targetPath.includes('/lecture/')) {
-    // 如果用户在讲座中，阻止导航到讲座外的页面
-    setTimeout(() => {
-      history.pushState({ preventBack: true, originalPath: currentPath }, '', currentPath)
-      router.replace(currentPath)
-    }, 0)
-    return
-  }
+  // 对于某些浏览器，添加额外的确认
+  event.preventDefault()
+  event.returnValue = ''
+  return ''
 }
 
 // 获取用户角色
 const getUserRole = () => {
-  const token = localStorage.getItem('token')
+  const token = sessionStorage.getItem('token')
   if (!token) return null
   
   try {
@@ -333,6 +303,41 @@ const getUserRole = () => {
   } catch (e) {
     console.error('Token解析失败:', e)
     return null
+  }
+}
+
+// 听众离开讲座处理
+const handleLeaveLecture = async () => {
+  const userRole = getUserRole()
+  const currentLecture = getCurrentLecture()
+  
+  if (userRole !== 'listener' || !currentLecture) {
+    return
+  }
+  
+  if (confirm('确定要离开当前讲座吗？')) {
+    try {
+      // 关闭讲座信息面板
+      showLectureInfo.value = false
+      
+      // 调用退出讲座API
+      await exitCurrentLecture()
+      
+      // 标记这是通过离开讲座按钮的合法导航
+      sessionStorage.setItem('homeButtonClicked', 'true')
+      
+      // 导航到听众首页
+      router.push('/listener/home')
+      
+      // 显示成功提示
+      setTimeout(() => {
+        alert(`您已成功离开讲座"${currentLecture.title}"`)
+      }, 100)
+      
+    } catch (error) {
+      console.error('离开讲座时发生错误:', error)
+      alert('离开讲座失败，请稍后重试')
+    }
   }
 }
 
@@ -361,29 +366,16 @@ const handleHomeClick = async () => {
       // 标记这是通过首页按钮的合法导航
       sessionStorage.setItem('homeButtonClicked', 'true')
       router.push('/speaker/home')
-    }
-  } else if (userRole === 'listener') {
-    // 检查是否在讲座中
-    if (route.path.includes('/lecture/')) {
-      if (confirm('点击首页将退出当前讲座，确定要继续吗？')) {
-        try {
-          await exitCurrentLecture()
-          // 标记这是通过首页按钮的合法导航
-          sessionStorage.setItem('homeButtonClicked', 'true')
-          router.push('/listener/home')
-        } catch (error) {
-          // 如果退出讲座失败，不进行导航
-          console.error('退出讲座失败，取消导航:', error)
-        }
-      }
-    } else {
-      // 标记这是通过首页按钮的合法导航
-      sessionStorage.setItem('homeButtonClicked', 'true')
+    } else if (userRole === 'listener') {
+      // 听众点击首页时，不退出讲座，直接导航到首页
       router.push('/listener/home')
     }
-  } else {
-    // 未登录时不做任何操作，防止跳转到登录页
-    return
+  } catch (error) {
+    console.error('首页导航过程中发生错误:', error)
+    // 即使发生错误，也尝试导航到相应的首页
+    const targetPath = userRole === 'speaker' ? '/speaker/home' : '/listener/home'
+    sessionStorage.setItem('homeButtonClicked', 'true')
+    router.push(targetPath)
   }
 }
 
@@ -400,7 +392,7 @@ const handleLogout = () => {
     removeHistoryGuard()
     
     // 清除本地存储的认证信息
-    localStorage.removeItem('token')
+    sessionStorage.removeItem('token')
     localStorage.removeItem('authToken')
     localStorage.removeItem('user')
     localStorage.removeItem('userRole')
@@ -425,61 +417,118 @@ const isHomeActive = computed(() => {
   return route.path === '/' || route.path === '/login'
 })
 
-// 获取当前讲座信息（真实接口）
-const currentLecture = ref(null)
 
-// 根据讲座ID获取讲座信息（真实接口，合并参与人数，并格式化时间）
-const fetchLectureById = async (lectureId) => {
-  if (!lectureId) return null
+// 获取当前讲座信息
+const getCurrentLecture = () => {
+  // 直接返回缓存的讲座数据
+  return currentLectureData.value
+}
+
+// 异步加载当前讲座信息
+const loadCurrentLecture = async () => {
+  const userRole = getUserRole()
+  if (!userRole) {
+    currentLectureData.value = null
+    return
+  }
+  
+  let lectureId = null
+  
+  // 优先从当前路由获取讲座信息
+  const isInLecture = route.path.includes('/lecture/')
+  if (isInLecture) {
+    lectureId = route.params.id
+  } else {
+    // 如果不在讲座页面，检查用户是否有当前参与的讲座
+    lectureId = localStorage.getItem('currentLectureId')
+  }
+  
+  if (lectureId) {
+    try {
+      const lectureData = await getLectureById(lectureId)
+      currentLectureData.value = lectureData
+    } catch (error) {
+      console.error('加载讲座信息失败:', error)
+      currentLectureData.value = null
+    }
+  } else {
+    currentLectureData.value = null
+  }
+}
+
+// 根据讲座ID获取讲座信息的辅助函数
+const getLectureById = async (lectureId) => {
   try {
-    const token = localStorage.getItem('token')
-    if (!token) return null
-    // 并发请求讲座详情和参与人数
-    const [lectureRes, participantRes] = await Promise.all([
-      fetch(`/api/lectures/${lectureId}`, {
+    const token = sessionStorage.getItem('token')
+    if (!token) {
+      console.error('未找到认证令牌')
+      return null
+    }
+    
+    // 调用API获取真实的讲座数据
+    const response = await fetch(`http://localhost:3001/api/lectures/${lectureId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (!response.ok) {
+      console.error('获取讲座信息失败:', response.status)
+      return null
+    }
+    
+    const result = await response.json()
+    const lectureData = result.lecture
+    
+    if (!lectureData) {
+      console.error('讲座数据不存在')
+      return null
+    }
+    
+    // 计算参与者数量（先获取基本信息，再获取实时参与者数量）
+    let participantCount = 0
+    let onlineParticipantCount = 0
+    try {
+      const participantResponse = await fetch(`http://localhost:3001/api/participants/count/${lectureId}`, {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }),
-      fetch(`/api/participants/lecture/${lectureId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       })
-    ])
-    if (lectureRes.ok) {
-      const data = await lectureRes.json()
-      let participantCount = 0
-      if (participantRes.ok) {
-        const pdata = await participantRes.json()
-        participantCount = pdata.participant_count || 0
+      if (participantResponse.ok) {
+        const participantResult = await participantResponse.json()
+        participantCount = participantResult.total_participants || 0
+        onlineParticipantCount = participantResult.online_participants || 0
       }
-      // 格式化时间
-      let formattedTime = ''
-      if (data.lecture.created_at) {
-        try {
-          formattedTime = new Date(data.lecture.created_at).toLocaleString('zh-CN', { hour12: false })
-        } catch (e) {
-          formattedTime = data.lecture.created_at
-        }
-      }
-      return {
-        id: data.lecture.id,
-        title: data.lecture.title,
-        speaker: data.lecture.name,
-        created_at: formattedTime,
-        status: data.lecture.status,
-        description: data.lecture.description,
-        participants: participantCount,
-        quizCount: (data.quizzes && Array.isArray(data.quizzes)) ? data.quizzes.length : 0,
-      }
+    } catch (error) {
+      console.warn('获取参与者数量失败，使用默认值:', error)
     }
+    
+    return {
+      id: lectureData.id,
+      title: lectureData.title,
+      speaker: lectureData.name || '未知讲者',
+      createdTime: new Date(lectureData.created_at), // 讲座创建时间
+      participants: participantCount,
+      onlineParticipants: onlineParticipantCount,
+      status: getStatusText(lectureData.status),
+      description: lectureData.description || ''
+    }
+  } catch (error) {
+    console.error('获取讲座信息时发生错误:', error)
     return null
-  } catch (e) {
-    console.error('获取讲座信息失败:', e)
-    return null
+  }
+}
+
+// 辅助函数：将数据库状态转换为状态文本
+const getStatusText = (status) => {
+  switch (status) {
+    case 0: return 'upcoming'  // 未开始
+    case 1: return 'active'    // 进行中
+    case 2: return 'ended'     // 已结束
+    default: return 'unknown'
   }
 }
 
@@ -488,9 +537,10 @@ const getCurrentLecture = () => {
   return currentLecture.value
 }
 
-// 监听路由变化和页面加载，自动拉取讲座信息
+<
+// 监听路由变化，自动设置当前讲座
 const updateCurrentLecture = async () => {
-  let lectureId = null
+
   if (route.path.includes('/lecture/')) {
     lectureId = route.params.id
   } else {
@@ -505,6 +555,8 @@ const updateCurrentLecture = async () => {
   } else {
     currentLecture.value = null
   }
+  // 异步加载讲座信息
+  await loadCurrentLecture()
 }
 
 // 退出当前讲座
@@ -518,7 +570,7 @@ const exitCurrentLecture = async () => {
   
   try {
     // 获取用户信息
-    const token = localStorage.getItem('token')
+    const token = sessionStorage.getItem('token')
     if (!token) return
     
     const payload = JSON.parse(atob(token.split('.')[1]))
@@ -604,32 +656,33 @@ const exitCurrentLecture = async () => {
 // 获取讲座状态文本
 const getLectureStatusText = () => {
   const lecture = getCurrentLecture()
-  if (!lecture || lecture.status === undefined || lecture.status === null) return ''
-  if (lecture.status === 2) return '已结束'
-  if (lecture.status === 1) return '进行中'
-  if (lecture.status === 0) return '未开始'
-  return ''
+
+  if (!lecture) return ''
+  
+  switch (lecture.status) {
+    case 'upcoming': return '即将开始'
+    case 'active': return '进行中'
+    case 'ended': return '已结束'
+    default: return '未知状态'
+  }
 }
 
 // 判断讲座是否已结束
 const isLectureEnded = (lecture) => {
   if (!lecture) return false
-  const now = new Date()
-  return now > lecture.endTime
+  return lecture.status === 'ended'
 }
 
 // 判断讲座是否正在进行中
 const isLectureActive = (lecture) => {
   if (!lecture) return false
-  const now = new Date()
-  return now >= lecture.startTime && now <= lecture.endTime
+  return lecture.status === 'active'
 }
 
 // 判断讲座是否即将开始
 const isLectureUpcoming = (lecture) => {
   if (!lecture) return false
-  const now = new Date()
-  return now < lecture.startTime
+  return lecture.status === 'upcoming'
 }
 
 // 格式化讲座时间
@@ -637,14 +690,118 @@ const formatLectureTime = () => {
   const lecture = getCurrentLecture()
   if (!lecture) return ''
   
-  const startTime = lecture.startTime
-  const endTime = lecture.endTime
+  const createdTime = lecture.createdTime
   
   const formatTime = (date) => {
-    return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+    return `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
   }
   
-  return `${formatTime(startTime)} - ${formatTime(endTime)}`
+  return formatTime(createdTime)
+}
+
+// 开始定时刷新参与者数量
+const startParticipantCountRefresh = () => {
+  const userRole = getUserRole()
+  const currentLecture = getCurrentLecture()
+  
+  if (!userRole || !currentLecture) {
+    return
+  }
+  
+  // 每30秒刷新一次参与者数量
+  participantCountTimer.value = setInterval(async () => {
+    await refreshParticipantCount()
+  }, 30000) // 30秒
+}
+
+// 停止定时刷新参与者数量
+const stopParticipantCountRefresh = () => {
+  if (participantCountTimer.value) {
+    clearInterval(participantCountTimer.value)
+    participantCountTimer.value = null
+  }
+}
+
+// 刷新参与者数量
+const refreshParticipantCount = async () => {
+  const currentLecture = getCurrentLecture()
+  if (!currentLecture) return
+  
+  try {
+    const response = await fetch(`http://localhost:3001/api/participants/count/${currentLecture.id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (response.ok) {
+      const result = await response.json()
+      // 更新当前讲座数据中的参与者数量
+      if (currentLectureData.value) {
+        currentLectureData.value.participants = result.total_participants
+        currentLectureData.value.onlineParticipants = result.online_participants
+      }
+    }
+  } catch (error) {
+    console.warn('刷新参与者数量失败:', error)
+  }
+}
+
+// 开始心跳
+const startHeartbeat = () => {
+  const userRole = getUserRole()
+  const currentLecture = getCurrentLecture()
+  
+  if (!userRole || !currentLecture) {
+    return
+  }
+  
+  // 每2分钟发送一次心跳
+  heartbeatTimer.value = setInterval(async () => {
+    await sendHeartbeat()
+  }, 120000) // 2分钟
+}
+
+// 停止心跳
+const stopHeartbeat = () => {
+  if (heartbeatTimer.value) {
+    clearInterval(heartbeatTimer.value)
+    heartbeatTimer.value = null
+  }
+}
+
+// 发送心跳
+const sendHeartbeat = async () => {
+  const currentLecture = getCurrentLecture()
+  const token = sessionStorage.getItem('token')
+  
+  if (!currentLecture || !token) return
+  
+  try {
+    await fetch(`http://localhost:3001/api/participants/heartbeat/${currentLecture.id}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+  } catch (error) {
+    console.warn('发送心跳失败:', error)
+  }
+}
+
+// 重启定时器
+const restartTimers = () => {
+  // 停止现有定时器
+  stopParticipantCountRefresh()
+  stopHeartbeat()
+  
+  // 延迟重启，等待路由更新完成
+  setTimeout(() => {
+    startParticipantCountRefresh()
+    startHeartbeat()
+  }, 1000)
 }
 
 // 新增格式化时间方法
@@ -821,6 +978,47 @@ function formatLectureTimePanel(lecture) {
   padding: 1rem 1.5rem;
 }
 
+.lecture-actions {
+  padding: 0 1.5rem 1.5rem 1.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.leave-lecture-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 1rem;
+}
+
+.leave-lecture-btn:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.leave-lecture-btn:active {
+  transform: translateY(0);
+}
+
+.btn-icon {
+  font-size: 1rem;
+}
+
+.btn-text {
+  flex: 1;
+  text-align: center;
+}
+
 .lecture-item {
   display: flex;
   align-items: flex-start;
@@ -849,6 +1047,12 @@ function formatLectureTimePanel(lecture) {
   color: #6b7280;
   flex: 1;
   line-height: 1.4;
+}
+
+.online-indicator {
+  color: #10b981;
+  font-weight: 600;
+  font-size: 0.9em;
 }
 
 .dropdown-arrow {
@@ -1098,6 +1302,15 @@ main.content-wrapper {
     padding: 0.75rem 1rem;
   }
   
+  .lecture-actions {
+    padding: 0 1rem 1rem 1rem;
+  }
+  
+  .leave-lecture-btn {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.85rem;
+  }
+  
   .dropdown-item {
     padding: 0.6rem 0.8rem;
     font-size: 0.85rem;
@@ -1174,6 +1387,11 @@ main.content-wrapper {
   }
   
   .dropdown-item {
+    padding: 0.5rem 0.7rem;
+    font-size: 0.8rem;
+  }
+  
+  .leave-lecture-btn {
     padding: 0.5rem 0.7rem;
     font-size: 0.8rem;
   }

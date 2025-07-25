@@ -43,13 +43,13 @@
                 <div class="action-buttons-header">
                   <div class="lecture-id">ID: {{ lecture.id }}</div>
                   <!-- 只有当用户已退出讲座（left状态）且讲座未结束时，才显示重新进入图标 -->
-                  <div v-if="lecture.participant_status === 'left' && lecture.status !== 2" class="reenter-icon" title="重新进入讲座" @click.stop="enterLecture(lecture)">
+                  <div v-if="lecture.participant_status === 'left' && lecture.status !== 2" class="reenter-icon" title="重新进入讲座" @click.stop="rejoinLecture(lecture)">
                     🔄
                   </div>
                 </div>
               </div>
               
-              <div class="card-content" @click="enterLecture(lecture)">
+              <div class="card-content" @click="viewLectureInfo(lecture)">
                 <div class="lecture-title">{{ lecture.title }}</div>
                 <div class="lecture-desc">{{ lecture.desc || '暂无简介' }}</div>
                 <div class="lecture-meta">
@@ -61,7 +61,7 @@
               </div>
               
               <div class="card-footer">
-                <span class="manage-text">点击进入管理</span>
+                <span class="manage-text">点击查看详情</span>
                 <span class="arrow">→</span>
               </div>
             </div>
@@ -173,14 +173,35 @@ const joinLecture = async () => {
   isJoining.value = true
   
   try {
-    const token = localStorage.getItem('token')
+    const token = sessionStorage.getItem('token')
     if (!token) {
       showMessage('请先登录', 'error')
       router.push('/login')
       return
     }
 
-    // 先检查讲座状态
+    // 1. 首先检查用户是否有未离开的讲座
+    const myLecturesResponse = await fetch('/api/participants/my-lectures', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (myLecturesResponse.ok) {
+      const myLecturesData = await myLecturesResponse.json()
+      // 查找状态为joined且讲座未结束的讲座
+      const activeJoinedLecture = myLecturesData.find((lecture: any) => 
+        lecture.participant_status === 'joined' && lecture.status !== 2
+      )
+      
+      if (activeJoinedLecture) {
+        showMessage(`您正在参与"${activeJoinedLecture.title}"讲座，请先离开此讲座才能加入其他讲座`, 'error')
+        return
+      }
+    }
+
+    // 2. 检查目标讲座是否存在
     const lectureResponse = await fetch(`/api/lectures/${lectureId.value}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -198,8 +219,48 @@ const joinLecture = async () => {
     }
 
     const lectureData = await lectureResponse.json()
-    
-    // 尝试加入讲座
+
+    // 3. 检查用户是否已经加入过这个讲座
+    const checkHistoryResponse = await fetch(`/api/participants/check-history/${lectureId.value}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    let hasJoinedBefore = false
+    if (checkHistoryResponse.ok) {
+      const checkData = await checkHistoryResponse.json()
+      hasJoinedBefore = checkData.hasJoined
+    }
+
+    // 4. 根据不同情况处理
+    if (hasJoinedBefore) {
+      // 用户已经加入过这个讲座
+      if (lectureData.status === 2) {
+        // 讲座已结束
+        showMessage('您已参与过此讲座，讲座已结束。请点击"已有讲座"中的相应讲座查看统计数据', 'error')
+      } else {
+        // 讲座未结束
+        showMessage('您已参与过此讲座。请点击"已有讲座"中的相应讲座重新进入', 'error')
+      }
+      return
+    }
+
+    // 5. 用户未加入过，检查讲座状态
+    if (lectureData.status === 2) {
+      // 讲座已结束，未加入过的用户不能加入
+      showMessage('讲座已结束，无法加入', 'error')
+      return
+    }
+
+    if (lectureData.status === 0) {
+      // 讲座未开始
+      showMessage('讲座尚未开始，请稍后再试', 'error')
+      return
+    }
+
+    // 6. 讲座进行中且用户未加入过，可以加入
     const joinResponse = await fetch(`/api/participants/join/${lectureId.value}`, {
       method: 'POST',
       headers: {
@@ -214,25 +275,18 @@ const joinLecture = async () => {
       return
     }
 
-    // 根据讲座状态跳转
-    if (lectureData.status === 1) {
-      // 讲座进行中，跳转到答题页面
-      showMessage('成功加入讲座！', 'success')
-      showCreate.value = false
-      setTimeout(() => {
-        router.push(`/listener/lecture/${lectureId.value}/quiz`)
-      }, 1000)
-    } else if (lectureData.status === 2) {
-      // 讲座已结束，跳转到统计页面
-      showMessage('讲座已结束，查看统计数据', 'success')
-      showCreate.value = false
-      setTimeout(() => {
-        router.push(`/listener/lecture/${lectureId.value}/score`)
-      }, 1000)
-    } else {
-      // 讲座未开始
-      showMessage('讲座尚未开始，请稍后再试', 'error')
+    // 成功加入讲座
+    showMessage('成功加入讲座！', 'success')
+    showCreate.value = false
+    
+    // 刷新讲座列表以显示新加入的讲座
+    if (showLectures.value) {
+      await fetchMyLectures()
     }
+    
+    setTimeout(() => {
+      router.push(`/listener/lecture/${lectureId.value}/quiz`)
+    }, 1000)
 
   } catch (error) {
     console.error('加入讲座错误:', error)
@@ -253,7 +307,7 @@ const toggleLectures = () => {
 // 获取我的讲座
 const fetchMyLectures = async () => {
   try {
-    const token = localStorage.getItem('token')
+    const token = sessionStorage.getItem('token')
     if (!token) return
 
     const response = await fetch('/api/participants/my-lectures', {
@@ -272,51 +326,81 @@ const fetchMyLectures = async () => {
   }
 }
 
-// 进入讲座
-const enterLecture = async (lecture: any) => {
-  // 如果用户已退出讲座，需要先重新加入
-  if (lecture.participant_status === 'left') {
-    try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        showMessage('请先登录', 'error')
-        router.push('/login')
-        return
-      }
-
-      const joinResponse = await fetch(`/api/participants/join/${lecture.id}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!joinResponse.ok) {
-        const errorData = await joinResponse.json()
-        showMessage(errorData.message || '重新加入讲座失败', 'error')
-        return
-      }
-
-      showMessage('成功重新加入讲座！', 'success')
-      // 更新本地状态
-      lecture.participant_status = 'joined'
-    } catch (error) {
-      console.error('重新加入讲座错误:', error)
-      showMessage('网络错误，请稍后重试', 'error')
-      return
-    }
+// 重新进入讲座（仅适用于未结束的讲座）
+const rejoinLecture = async (lecture: any) => {
+  if (lecture.status === 2) {
+    showMessage('讲座已结束，无法重新进入', 'error')
+    return
   }
 
-  // 根据讲座状态跳转
-  if (lecture.status === 1) {
-    // 讲座进行中，跳转到答题页面
+  try {
+    const token = sessionStorage.getItem('token')
+    if (!token) {
+      showMessage('请先登录', 'error')
+      router.push('/login')
+      return
+    }
+
+    const joinResponse = await fetch(`/api/participants/join/${lecture.id}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!joinResponse.ok) {
+      const errorData = await joinResponse.json()
+      showMessage(errorData.message || '重新加入讲座失败', 'error')
+      return
+    }
+
+    showMessage('成功重新加入讲座！', 'success')
+    
+    // 更新本地状态
+    lecture.participant_status = 'joined'
+    
+    // 刷新讲座列表以确保状态同步
+    await fetchMyLectures()
+    
+    // 根据讲座状态跳转
+    if (lecture.status === 1) {
+      // 讲座进行中，跳转到答题页面
+      router.push(`/listener/lecture/${lecture.id}/quiz`)
+    } else {
+      showMessage('讲座尚未开始', 'error')
+    }
+  } catch (error) {
+    console.error('重新加入讲座错误:', error)
+    showMessage('网络错误，请稍后重试', 'error')
+  }
+}
+
+// 查看讲座信息
+const viewLectureInfo = (lecture: any) => {
+  // 如果用户状态为joined且讲座进行中，跳转到答题页面
+  if (lecture.participant_status === 'joined' && lecture.status === 1) {
+    // 用户已加入且讲座进行中，跳转到答题页面
     router.push(`/listener/lecture/${lecture.id}/quiz`)
   } else if (lecture.status === 2) {
     // 讲座已结束，跳转到统计页面
     router.push(`/listener/lecture/${lecture.id}/score`)
+  } else if (lecture.status === 1) {
+    // 讲座进行中但用户已退出，跳转到统计页面查看信息（不能答题）
+    router.push(`/listener/lecture/${lecture.id}/score`)
+  } else if (lecture.status === 0) {
+    showMessage('讲座尚未开始，暂无可查看内容', 'error')
+  }
+}
+
+// 进入讲座（保持原有逻辑兼容性）
+const enterLecture = async (lecture: any) => {
+  // 如果用户已退出讲座且讲座未结束，需要先重新加入
+  if (lecture.participant_status === 'left' && lecture.status !== 2) {
+    await rejoinLecture(lecture)
   } else {
-    showMessage('讲座尚未开始', 'error')
+    // 其他情况直接查看信息
+    viewLectureInfo(lecture)
   }
 }
 
