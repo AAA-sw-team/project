@@ -68,7 +68,7 @@
         <h3 class="section-title">详细反馈</h3>
       </div>
       <div v-if="feedbacks.length === 0" class="empty-state">
-        <div class="empty-icon">��</div>
+        <div class="empty-icon">📊</div>
         <h4>暂无反馈内容</h4>
         <p>听众的反馈将在这里展示</p>
       </div>

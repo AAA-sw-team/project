@@ -36,9 +36,10 @@
                 </div>
               </div>
               <div class="card-footer">
-                <button class="manage-btn btn-discussion" @click="goToPage(lecture.id, 'discussion')">讨论区</button>
-                <button class="manage-btn btn-feedback" @click="goToPage(lecture.id, 'feedback')">反馈</button>
-                <button class="manage-btn btn-score" @click="goToPage(lecture.id, 'score')">成绩总览</button>
+                <div class="manage-btn-group">
+                  <button class="manage-btn btn-discussion" @click="goToPage(lecture.id, 'discussion')">讨论区</button>
+                  <button class="manage-btn btn-feedback" @click="goToPage(lecture.id, 'feedback')">反馈</button>
+                </div>
               </div>
             </div>
           </div>
@@ -485,7 +486,7 @@ function getStatusClass(status) {
 }
 .card-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   padding-top: 1.2rem;
   border-top: 1px solid rgba(148, 163, 184, 0.2);
@@ -789,6 +790,12 @@ function getStatusClass(status) {
 }
 .manage-btn.btn-score:hover {
   background: linear-gradient(135deg, #a8ff78 0%, #059669 100%);
+}
+.manage-btn-group {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  width: 100%;
 }
 @media (max-width: 768px) {
   .organizer-home-bg {

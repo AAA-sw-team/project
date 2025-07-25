@@ -2,7 +2,7 @@
   <div class="lecture-layout">
     <aside class="sidebar">
       <button class="all-lectures-btn" @click="goHome">所有讲座</button>
-      <router-link :to="`/organizer/lectures/${lectureId}/score`" :class="{active: isActive('score')}">成绩总览</router-link>
+      <!-- <router-link :to="`/organizer/lectures/${lectureId}/score`" :class="{active: isActive('score')}">成绩总览</router-link> -->
       <router-link :to="`/organizer/lectures/${lectureId}/discussion`" :class="{active: isActive('discussion')}">讨论区</router-link>
       <router-link :to="`/organizer/lectures/${lectureId}/feedback`" :class="{active: isActive('feedback')}">听众反馈</router-link>
     </aside>
