@@ -60,13 +60,14 @@ class FeedbackController {
             const { lectureId } = req.params;
             const { page = 1, limit = 50 } = req.query;
             const userId = req.user.userId;
+            const userRole = req.user.role;
 
-            // 验证讲师权限
+            // 验证讲师或组织者权限
             const hasPermission = await ParticipantModel.isLectureCreator(lectureId, userId);
-            if (!hasPermission) {
+            if (!hasPermission && userRole !== 'organizer') {
                 return res.status(403).json({
                     success: false,
-                    message: '只有讲座创建者可以查看反馈'
+                    message: '只有讲座创建者或组织者可以查看反馈'
                 });
             }
 
@@ -103,13 +104,14 @@ class FeedbackController {
         try {
             const { lectureId } = req.params;
             const userId = req.user.userId;
+            const userRole = req.user.role;
 
-            // 验证讲师权限
+            // 验证讲师或组织者权限
             const hasPermission = await ParticipantModel.isLectureCreator(lectureId, userId);
-            if (!hasPermission) {
+            if (!hasPermission && userRole !== 'organizer') {
                 return res.status(403).json({
                     success: false,
-                    message: '只有讲座创建者可以查看反馈统计'
+                    message: '只有讲座创建者或组织者可以查看反馈统计'
                 });
             }
 

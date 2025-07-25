@@ -12,7 +12,7 @@ async function createLecture_db(title, description, speakerId, name) {
  * 获取所有讲座
  */
 async function getAllLectures_db() {
-  const sql = 'SELECT id, title, description, name, created_at FROM lectures ORDER BY created_at DESC';
+  const sql = 'SELECT id, title, description, name, status, created_at FROM lectures ORDER BY created_at DESC';
   return pool.promise().query(sql);
 }
 // 获取当前用户的讲座，按创建时间倒序
