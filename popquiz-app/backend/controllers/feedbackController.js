@@ -29,9 +29,9 @@ class FeedbackController {
 
             // 提交反馈
             const result = await FeedbackModel.submitFeedback(
-                lectureId, 
-                userId, 
-                feedbackType, 
+                lectureId,
+                userId,
+                feedbackType,
                 feedbackMessage
             );
 
@@ -71,17 +71,17 @@ class FeedbackController {
             }
 
             const result = await FeedbackModel.getLectureFeedback(
-                lectureId, 
-                parseInt(page), 
+                lectureId,
+                parseInt(page),
                 parseInt(limit)
             );
 
             // 添加反馈类型文本描述
             const feedbackTypes = FeedbackModel.getFeedbackTypes();
-            result.feedbacks = result.feedbacks.map(feedback => ({
+            result.feedbacks = Array.isArray(result.feedbacks) ? result.feedbacks.map(feedback => ({
                 ...feedback,
                 feedbackTypeText: feedbackTypes[feedback.feedback_type]
-            }));
+            })) : [];
 
             res.json({
                 success: true,
@@ -117,15 +117,15 @@ class FeedbackController {
 
             // 添加反馈类型文本描述
             const feedbackTypes = FeedbackModel.getFeedbackTypes();
-            result.stats = result.stats.map(stat => ({
+            result.stats = Array.isArray(result.stats) ? result.stats.map(stat => ({
                 ...stat,
                 feedbackTypeText: feedbackTypes[stat.feedback_type]
-            }));
+            })) : [];
 
-            result.recentFeedback = result.recentFeedback.map(feedback => ({
+            result.recentFeedback = Array.isArray(result.recentFeedback) ? result.recentFeedback.map(feedback => ({
                 ...feedback,
                 feedbackTypeText: feedbackTypes[feedback.feedback_type]
-            }));
+            })) : [];
 
             res.json({
                 success: true,
@@ -179,7 +179,7 @@ class FeedbackController {
     static async getFeedbackTypes(req, res) {
         try {
             const feedbackTypes = FeedbackModel.getFeedbackTypes();
-            
+
             res.json({
                 success: true,
                 message: '获取反馈类型成功',
@@ -226,7 +226,7 @@ class FeedbackController {
                 GROUP BY feedback_type
                 ORDER BY count DESC
             `;
-            
+
             const db = require('../models/db');
             const [recentStats] = await db.execute(recentQuery, [lectureId]);
 

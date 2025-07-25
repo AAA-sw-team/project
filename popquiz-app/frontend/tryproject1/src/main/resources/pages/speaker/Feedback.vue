@@ -21,15 +21,15 @@
         
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-number">{{ feedbacks.length }}</div>
+            <div class="stat-number">{{ stats.total }}</div>
             <div class="stat-label">总反馈数</div>
           </div>
           <div class="stat-card">
-            <div class="stat-number">{{ getPositiveFeedbackCount() }}</div>
+            <div class="stat-number">{{ stats.positive }}</div>
             <div class="stat-label">正面反馈</div>
           </div>
           <div class="stat-card">
-            <div class="stat-number">{{ getAverageRating() }}</div>
+            <div class="stat-number">{{ stats.average }}</div>
             <div class="stat-label">平均评分</div>
           </div>
         </div>
@@ -81,70 +81,64 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import axios from 'axios'
 
 const route = useRoute()
 const lectureId = route.params.id
 
+const feedbacks = ref([])
+const stats = ref({ total: 0, positive: 0, average: 0 })
 const loading = ref(true)
 
-// 只显示当前讲座的反馈数据
-const feedbacks = ref([
-  { 
-    id: 1, 
-    userName: '张同学', 
-    text: '讲座内容非常充实，特别是AI应用案例分析部分让我收获很多。希望能有更多这样的讲座！', 
-    rating: 5,
-    type: 'positive',
-    time: new Date(Date.now() - 600000),
-    tags: ['内容丰富', '案例实用']
-  },
-  { 
-    id: 2, 
-    userName: '李老师', 
-    text: '演讲者的表达很清晰，但是PPT字体可以再大一些，后排同学可能看不清楚。', 
-    rating: 4,
-    type: 'suggestion',
-    time: new Date(Date.now() - 450000),
-    tags: ['表达清晰', '建议改进']
-  },
-  { 
-    id: 3, 
-    userName: '王学生', 
-    text: '时间安排很合理，互动环节设计得很好，让我们有机会提问和讨论。', 
-    rating: 5,
-    type: 'positive',
-    time: new Date(Date.now() - 300000),
-    tags: ['时间合理', '互动性强']
-  },
-  { 
-    id: 4, 
-    userName: '陈博士', 
-    text: '讲座质量很高，但是语速稍快，建议可以慢一点让大家更好地理解。', 
-    rating: 4,
-    type: 'suggestion',
-    time: new Date(Date.now() - 180000),
-    tags: ['质量高', '语速建议']
-  },
-  { 
-    id: 5, 
-    userName: '刘同学', 
-    text: '很棒的讲座！从中学到了很多前沿技术知识，对我的学习和研究都很有帮助。', 
-    rating: 5,
-    type: 'positive',
-    time: new Date(Date.now() - 120000),
-    tags: ['前沿技术', '学习帮助']
+const fetchFeedbacks = async () => {
+  loading.value = true
+  try {
+    const token = localStorage.getItem('token')
+    // 获取反馈列表
+    const res = await axios.get(`/api/feedback/lecture/${lectureId}/all`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (res.data && res.data.success && res.data.data && res.data.data.feedbacks) {
+      feedbacks.value = res.data.data.feedbacks.map(item => ({
+        id: item.id,
+        userName: item.username,
+        text: item.feedback_message,
+        rating: 5, // 后端无评分，前端可自定义或忽略
+        type: item.feedback_type,
+        time: new Date(item.created_at),
+        tags: [] // 后端无tags
+      }))
+    } else {
+      feedbacks.value = []
+    }
+  } catch (e) {
+    feedbacks.value = []
   }
-])
-
-const getPositiveFeedbackCount = () => {
-  return feedbacks.value.filter(f => f.type === 'positive').length
+  loading.value = false
 }
 
-const getAverageRating = () => {
-  if (feedbacks.value.length === 0) return '0.0'
-  const total = feedbacks.value.reduce((sum, f) => sum + f.rating, 0)
-  return (total / feedbacks.value.length).toFixed(1)
+const fetchStats = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const res = await axios.get(`/api/feedback/lecture/${lectureId}/stats`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (res.data && res.data.success && res.data.data) {
+      const statArr = res.data.data.stats || []
+      const total = res.data.data.totalCount || 0
+      const positive = statArr.find(s => s.feedback_type === 'good')?.count || 0
+      const average = total > 0 ? (positive * 5 / total).toFixed(1) : '0.0'
+      stats.value = { total, positive, average }
+    } else {
+      stats.value = { total: 0, positive: 0, average: 0 }
+    }
+  } catch (e) {
+    stats.value = { total: 0, positive: 0, average: 0 }
+  }
 }
+
+const getPositiveFeedbackCount = () => stats.value.positive
+const getAverageRating = () => stats.value.average
 
 const getFeedbackTypeClass = (type: string) => {
   switch (type) {
@@ -177,9 +171,9 @@ const formatTime = (time: Date) => {
 }
 
 onMounted(() => {
-  setTimeout(() => { 
-    loading.value = false 
-  }, 400)
+  fetchFeedbacks()
+  fetchStats()
+  loading.value = false
 })
 </script>
 

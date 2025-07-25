@@ -14,7 +14,7 @@
               <span class="link-icon">🏠</span>
               <span class="link-text">首页</span>
             </a>
-            <!-- 讲座信息按钮 -->
+            <!-- 当前讲座按钮（恢复并美化，显示真实数据） -->
             <div class="lecture-info-dropdown" v-if="getUserRole() && getCurrentLecture()">
               <a href="#" class="nav-link" @click.prevent="toggleLectureInfo" :class="{ active: showLectureInfo }">
                 <span class="link-icon">📚</span>
@@ -23,14 +23,14 @@
               </a>
               <div class="lecture-info-panel" v-show="showLectureInfo">
                 <div class="lecture-header">
-                  <h3 class="lecture-title">{{ getCurrentLecture().title }}</h3>
+                  <h3 class="lecture-title">{{ getCurrentLecture().title || '无' }}</h3>
                   <span class="lecture-status" :class="getCurrentLecture().status">{{ getLectureStatusText() }}</span>
                 </div>
                 <div class="lecture-details">
                   <div class="lecture-item">
                     <span class="item-icon">👤</span>
                     <span class="item-label">讲者：</span>
-                    <span class="item-value">{{ getCurrentLecture().speaker }}</span>
+                    <span class="item-value">{{ getCurrentLecture().speaker || '无' }}</span>
                   </div>
                   <div class="lecture-item">
                     <span class="item-icon">🕒</span>
@@ -47,10 +47,10 @@
                       </span>
                     </span>
                   </div>
-                  <div class="lecture-item" v-if="getCurrentLecture().description">
+                  <div class="lecture-item">
                     <span class="item-icon">📝</span>
                     <span class="item-label">描述：</span>
-                    <span class="item-value">{{ getCurrentLecture().description }}</span>
+                    <span class="item-value">{{ getCurrentLecture().description || '无' }}</span>
                   </div>
                 </div>
                 <!-- 离开讲座按钮（仅听众可用） -->
@@ -139,9 +139,42 @@ const toggleSettingsDropdown = () => {
 }
 
 // 讲座信息面板处理
-const toggleLectureInfo = () => {
+const toggleLectureInfo = async () => {
   showLectureInfo.value = !showLectureInfo.value
   showSettingsDropdown.value = false // 关闭设置下拉菜单
+  if (showLectureInfo.value) {
+    // 每次点击都重新拉取讲座信息和参与人数和状态
+    let lectureId = null
+    if (route.path.includes('/lecture/')) {
+      lectureId = route.params.id
+    } else {
+      lectureId = localStorage.getItem('currentLectureId')
+    }
+    if (lectureId) {
+      // 拉取讲座详情（含最新status）
+      const lecture = await fetchLectureById(lectureId)
+      // 拉取参与人数
+      let participantCount = '无'
+      try {
+        const token = localStorage.getItem('token')
+        const res = await fetch(`/api/participants/lecture/${lectureId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          participantCount = data.participant_count !== undefined ? data.participant_count : '无'
+        }
+      } catch {}
+      currentLecture.value = {
+        ...lecture,
+        participants: participantCount,
+        status: lecture.status // 确保最新状态
+      }
+    }
+  }
 }
 
 // 点击外部关闭下拉菜单
@@ -375,6 +408,7 @@ const isHomeActive = computed(() => {
   return route.path === '/' || route.path === '/login'
 })
 
+
 // 获取当前讲座信息
 const getCurrentLecture = () => {
   // 直接返回缓存的讲座数据
@@ -489,22 +523,28 @@ const getStatusText = (status) => {
   }
 }
 
-// 设置当前讲座ID（当用户进入讲座时调用）
-const setCurrentLecture = (lectureId) => {
-  if (lectureId) {
-    localStorage.setItem('currentLectureId', lectureId)
-  } else {
-    localStorage.removeItem('currentLectureId')
-  }
+// 获取当前讲座信息
+const getCurrentLecture = () => {
+  return currentLecture.value
 }
 
+<
 // 监听路由变化，自动设置当前讲座
 const updateCurrentLecture = async () => {
+
   if (route.path.includes('/lecture/')) {
-    const lectureId = route.params.id
-    if (lectureId) {
-      setCurrentLecture(lectureId)
+    lectureId = route.params.id
+  } else {
+    lectureId = localStorage.getItem('currentLectureId')
+  }
+  if (lectureId) {
+    const lecture = await fetchLectureById(lectureId)
+    currentLecture.value = lecture
+    if (lecture) {
+      localStorage.setItem('currentLectureId', lectureId)
     }
+  } else {
+    currentLecture.value = null
   }
   // 异步加载讲座信息
   await loadCurrentLecture()
@@ -607,6 +647,7 @@ const exitCurrentLecture = async () => {
 // 获取讲座状态文本
 const getLectureStatusText = () => {
   const lecture = getCurrentLecture()
+
   if (!lecture) return ''
   
   switch (lecture.status) {
@@ -752,6 +793,31 @@ const restartTimers = () => {
     startParticipantCountRefresh()
     startHeartbeat()
   }, 1000)
+}
+
+// 新增格式化时间方法
+function formatLectureTimePanel(lecture) {
+  // 支持mock和真实数据
+  if (!lecture) return '无'
+  // mock数据有startTime/endTime，真实数据只有created_at
+  if (lecture.startTime && lecture.endTime) {
+    const format = d => `${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getDate().toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`
+    return `${format(lecture.startTime)} - ${format(lecture.endTime)}`
+  }
+  if (lecture.created_at) {
+    // 尝试解析created_at
+    try {
+      const d = new Date(lecture.created_at)
+      const mm = (d.getMonth()+1).toString().padStart(2,'0')
+      const dd = d.getDate().toString().padStart(2,'0')
+      const hh = d.getHours().toString().padStart(2,'0')
+      const min = d.getMinutes().toString().padStart(2,'0')
+      return `${mm}/${dd} ${hh}:${min}`
+    } catch {
+      return lecture.created_at
+    }
+  }
+  return '无'
 }
 </script>
 

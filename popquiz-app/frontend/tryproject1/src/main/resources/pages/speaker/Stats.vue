@@ -169,7 +169,7 @@ const selectedUserAnswers = ref<any[]>([])
 // 获取讲座基本信息
 const fetchLectureInfo = async (id: string) => {
   try {
-    const token = localStorage.getItem('authToken')
+    const token = localStorage.getItem('token')
     if (!token) {
       console.error('未找到认证令牌')
       return null
@@ -198,7 +198,7 @@ const fetchLectureInfo = async (id: string) => {
 // 获取讲座统计信息
 const fetchLectureStats = async (id: string) => {
   try {
-    const token = localStorage.getItem('authToken')
+    const token = localStorage.getItem('token')
     const response = await fetch(`/api/statistics/lecture/${id}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -219,7 +219,7 @@ const fetchLectureStats = async (id: string) => {
 // 获取题目统计信息
 const fetchQuizStats = async (id: string) => {
   try {
-    const token = localStorage.getItem('authToken')
+    const token = localStorage.getItem('token')
     const response = await fetch(`/api/answers/statistics/${id}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -240,7 +240,7 @@ const fetchQuizStats = async (id: string) => {
 // 获取用户答题详情
 const fetchUserAnswers = async (userId: number) => {
   try {
-    const token = localStorage.getItem('authToken')
+    const token = localStorage.getItem('token')
     const response = await fetch(`/api/answers/user/${userId}/lecture/${lectureId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -255,6 +255,27 @@ const fetchUserAnswers = async (userId: number) => {
   } catch (error) {
     console.error('获取用户答题详情失败:', error)
     return []
+  }
+}
+
+// 新增：获取讲座参与人数
+const fetchParticipantCount = async (id: string) => {
+  try {
+    const token = localStorage.getItem('token')
+    const response = await fetch(`/api/participants/lecture/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    if (response.ok) {
+      const data = await response.json()
+      return data.participant_count || 0
+    }
+    return 0
+  } catch (error) {
+    console.error('获取参与人数失败:', error)
+    return 0
   }
 }
 
@@ -282,12 +303,15 @@ const loadData = async () => {
     // 获取题目统计
     const quizStats = await fetchQuizStats(lectureId as string)
     
+    // 获取参与人数
+    const participantCount = await fetchParticipantCount(lectureId as string)
+    
     // 构建讲座数据
     lecture.value = {
       ...lectureInfo,
       overallStats: stats?.overallStats || null,
       userRankings: stats?.rankings || [],
-      participantCount: stats?.overallStats?.total_users || 0,
+      participantCount: participantCount, // 用接口返回的真实人数
       quizStats: quizStats || [],
       quizCount: (quizStats || []).length
     }
@@ -295,7 +319,7 @@ const loadData = async () => {
   } catch (error) {
     console.error('加载数据失败:', error)
     // 如果API调用失败，使用模拟数据
-    lecture.value = getMockData()
+    // lecture.value = getMockData()
   }
   loading.value = false
 }

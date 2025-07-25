@@ -7,7 +7,7 @@ const getLectureOverallStats = async (lectureId) => {
       COUNT(DISTINCT a.user_id) AS total_users,
       COUNT(a.id) AS total_answers,
       SUM(a.is_correct) AS total_correct
-    FROM answers a
+    FROM quiz_answers a
     JOIN quizzes q ON a.quiz_id = q.id
     WHERE q.lecture_id = ?`,
     [lectureId]
@@ -25,7 +25,7 @@ const getUserRankings = async (lectureId) => {
        COUNT(a.id) AS total_answered,
        ROUND(SUM(a.is_correct)/COUNT(a.id)*100,2) AS accuracy
      FROM users u
-     JOIN answers a ON u.id = a.user_id
+     JOIN quiz_answers a ON u.id = a.user_id
      JOIN quizzes q ON a.quiz_id = q.id
      WHERE q.lecture_id = ?
      GROUP BY u.id
