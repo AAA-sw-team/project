@@ -146,7 +146,7 @@ function toggleLectures() {
 
 async function fetchLectures() {
   try {
-    const token = localStorage.getItem('token')
+    const token = sessionStorage.getItem('token')
     const res = await fetch('/api/lectures/my', {
       headers: { 'Authorization': `Bearer ${token}` }
     })
@@ -174,7 +174,7 @@ async function createLecture() {
     console.log('表单未填全', newLecture.value)
     return
   }
-  const token = localStorage.getItem('token')
+  const token = sessionStorage.getItem('token')
   console.log('token', token)
   if (!token) {
     alert('请先登录！')
@@ -225,7 +225,7 @@ async function createLecture() {
 
 async function deleteLecture(id: number) {
   if (!confirm('确定要删除该讲座吗？')) return
-  const token = localStorage.getItem('token')
+  const token = sessionStorage.getItem('token')
   try {
     const res = await fetch(`/api/lectures/${id}`, {
       method: 'DELETE',
@@ -246,7 +246,7 @@ async function restartLecture(id: number) {
   console.log('尝试重新开始讲座:', id)
   if (!confirm('确定要重新开始这个讲座吗？\n\n重新开始后：\n• 讲座状态将变为"进行中"\n• 您可以继续管理题目和与听众互动\n• 之前的数据和统计不会丢失')) return
   
-  const token = localStorage.getItem('token')
+  const token = sessionStorage.getItem('token')
   console.log('使用token:', token ? '已获取到token' : '未找到token')
   
   if (!token) {

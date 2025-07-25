@@ -105,36 +105,66 @@ const userAnswers = ref<string[]>([])
 const answered = ref(false)
 const isCorrect = ref(false)
 const loading = ref(true)
+const currentLecture = ref<any>(null) // 新增：存储当前讲座信息
 const currentQuestion = computed(() => questions.value[currentIndex.value])
 const isLast = computed(() => currentIndex.value === questions.value.length - 1)
 
 // 获取当前讲座信息
-const getCurrentLecture = () => {
+const getCurrentLecture = async () => {
   const currentLectureId = localStorage.getItem('currentLectureId')
-  if (currentLectureId && currentLectureId === lectureId) {
-    // 模拟讲座数据，实际应该从API获取
-    return {
-      id: lectureId,
-      title: 'AI与机器学习前沿技术',
-      speaker: '张教授',
-      startTime: new Date(2024, 11, 25, 14, 0),
-      endTime: new Date(2024, 11, 25, 16, 0),
-      status: 'active'
-    }
+  if (!currentLectureId || currentLectureId !== lectureId) {
+    return null
   }
-  return null
+  
+  try {
+    const token = sessionStorage.getItem('token')
+    if (!token) {
+      console.error('未找到认证令牌')
+      return null
+    }
+    
+    // 调用API获取讲座信息
+    const response = await fetch(`http://localhost:3001/api/lectures/${lectureId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (!response.ok) {
+      console.error('获取讲座信息失败:', response.status)
+      return null
+    }
+    
+    const result = await response.json()
+    const lectureData = result.lecture
+    
+    return {
+      id: lectureData.id,
+      title: lectureData.title,
+      description: lectureData.description,
+      speaker: lectureData.name || '未知讲者',
+      createdAt: new Date(lectureData.created_at),
+      status: lectureData.status, // 0: 未开始, 1: 进行中, 2: 已结束
+      speakerId: lectureData.speaker_id
+    }
+  } catch (error) {
+    console.error('获取讲座信息时发生错误:', error)
+    return null
+  }
 }
 
 // 检查讲座状态
 const checkLectureStatus = () => {
-  const lecture = getCurrentLecture()
-  if (!lecture) return { ended: false, upcoming: false, active: false }
+  if (!currentLecture.value) return { ended: false, upcoming: false, active: false }
   
-  const now = new Date()
+  // 基于数据库状态字段判断：0-未开始, 1-进行中, 2-已结束
+  const status = currentLecture.value.status
   return {
-    ended: now > lecture.endTime,
-    upcoming: now < lecture.startTime,
-    active: now >= lecture.startTime && now <= lecture.endTime
+    ended: status === 2,     // 已结束
+    upcoming: status === 0,  // 未开始
+    active: status === 1     // 进行中
   }
 }
 
@@ -145,13 +175,17 @@ const isLectureActive = computed(() => lectureStatus.value.active)
 
 // 模拟AI生成题目（实际应调用后端API，AI生成题目并返回）
 async function fetchQuestions() {
+  loading.value = true
+  
+  // 首先获取讲座信息
+  currentLecture.value = await getCurrentLecture()
+  
   // 如果讲座已结束或未开始，不加载题目
   if (isLectureEnded.value || isLectureUpcoming.value) {
     loading.value = false
     return
   }
   
-  loading.value = true
   // 这里用静态数据，实际应调用API
   await new Promise(r => setTimeout(r, 1000))
   questions.value = [
