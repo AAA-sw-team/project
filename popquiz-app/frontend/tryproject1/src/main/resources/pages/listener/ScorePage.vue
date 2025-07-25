@@ -6,21 +6,34 @@
       <p class="subtitle animate-fade-in-delay">查看答题结果与详细分析</p>
     </div>
 
-    <div class="score-content">
+    <div v-if="loading" class="loading-container">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">正在加载成绩数据...</p>
+    </div>
+
+    <div v-else-if="error" class="error-container">
+      <div class="error-icon">⚠️</div>
+      <p class="error-text">{{ error }}</p>
+      <button @click="fetchScoreData" class="retry-btn">重试</button>
+    </div>
+
+    <div v-else class="score-content">
       <!-- 成绩概览 -->
       <div class="score-overview">
         <div class="stats-grid">
-          <div class="stat-card accuracy">
+          <div class="stat-card accuracy clickable" @click="showAccuracyModal">
             <div class="stat-icon">🎯</div>
-            <div class="stat-number">{{ accuracy }}%</div>
-            <div class="stat-label">正确率</div>
-            <div class="stat-description">{{ correctCount }}/{{ questions.length }} 题正确</div>
+            <div class="stat-number">{{ overallAccuracy }}%</div>
+            <div class="stat-label">总体正确率</div>
+            <div class="stat-description">{{ totalCorrect }}/{{ totalAnswers }} 题正确</div>
+            <div class="click-hint">点击查看详情</div>
           </div>
-          <div class="stat-card completion">
+          <div class="stat-card completion clickable" @click="showCompletionModal">
             <div class="stat-icon">📝</div>
-            <div class="stat-number">{{ answerRate }}%</div>
-            <div class="stat-label">完成率</div>
-            <div class="stat-description">{{ answeredCount }}/{{ questions.length }} 题作答</div>
+            <div class="stat-number">{{ completionRate }}%</div>
+            <div class="stat-label">总体完成率</div>
+            <div class="stat-description">{{ answeredQuestions }}/{{ totalQuestions }} 题作答</div>
+            <div class="click-hint">点击查看详情</div>
           </div>
           <div class="stat-card performance" :class="getPerformanceClass()">
             <div class="stat-icon">⭐</div>
@@ -31,79 +44,171 @@
         </div>
       </div>
 
-      <!-- 题目详情 -->
-      <div v-if="questions.length" class="questions-section">
-        <h3 class="section-title">📋 题目详情</h3>
-        
-        <div class="question-navigation">
-          <div class="nav-info">
-            <span class="current-question">第 {{ currentIndex + 1 }} 题</span>
-            <span class="total-questions">共 {{ questions.length }} 题</span>
-          </div>
-          <div class="nav-buttons">
-            <button @click="prevQuestion" :disabled="currentIndex === 0" class="nav-btn prev">
-              <span>←</span>
-              <span>上一题</span>
-            </button>
-            <button @click="nextQuestion" :disabled="currentIndex === questions.length - 1" class="nav-btn next">
-              <span>下一题</span>
-              <span>→</span>
-            </button>
+      <!-- 分组统计 -->
+      <div v-if="false" class="groups-section" style="display: none;">
+        <h3 class="section-title">� 分组统计</h3>
+        <div class="groups-grid">
+          <div v-for="group in groupStats" :key="group.group_id" class="group-card">
+            <div class="group-header">
+              <div class="group-title">第 {{ group.group_id }} 组</div>
+              <div class="group-questions">{{ group.questions_count }} 题</div>
+            </div>
+            <div class="group-stats">
+              <div class="group-stat">
+                <span class="stat-value">{{ group.accuracy_rate || 0 }}%</span>
+                <span class="stat-label">正确率</span>
+              </div>
+              <div class="group-stat">
+                <span class="stat-value">{{ group.participants_count || 0 }}</span>
+                <span class="stat-label">参与人数</span>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
 
-        <div class="question-card">
-          <div class="question-header">
-            <div class="question-number">题目 {{ currentIndex + 1 }}</div>
-            <div class="result-badge" :class="getQuestionResultClass(currentIndex)">
-              {{ getQuestionResultText(currentIndex) }}
+      <!-- 我的排名 -->
+      <div class="my-ranking-section">
+        <h3 class="section-title">🏆 我的排名</h3>
+        
+
+        
+        <div v-if="myRank && myRankInfo" class="my-rank-card">
+          <div class="rank-display">
+            <div class="rank-number" :class="getRankClass(myRank - 1)">{{ myRank }}</div>
+            <div class="rank-info">
+              <div class="rank-label">当前排名</div>
+              <div class="rank-total">共 {{ leaderboard.length }} 人</div>
+            </div>
+          </div>
+          <div class="rank-stats">
+            <div class="rank-stat">
+              <span class="stat-value">{{ myRankInfo.accuracy_rate || 0 }}%</span>
+              <span class="stat-label">正确率</span>
+            </div>
+            <div class="rank-stat">
+              <span class="stat-value">{{ myRankInfo.total_questions || 0 }}</span>
+              <span class="stat-label">答题数</span>
+            </div>
+          </div>
+        </div>
+        <div v-else class="no-rank-card">
+          <div class="no-rank-icon">📝</div>
+          <div class="no-rank-text">暂未参与答题</div>
+          <div class="no-rank-desc">完成答题后即可查看排名</div>
+        </div>
+      </div>
+
+      <!-- 排行榜 -->
+      <div v-if="leaderboard.length" class="leaderboard-section">
+        <h3 class="section-title">🏆 答题排行榜</h3>
+        <div class="leaderboard-list">
+          <div v-for="(user, index) in leaderboard.slice(0, 5)" :key="user.user_id || user.id" class="leaderboard-item" :class="{ 'is-me': isCurrentUser(user) }">
+            <div class="rank-badge" :class="getRankClass(index)">{{ index + 1 }}</div>
+            <div class="user-info">
+              <div class="username">{{ user.nickname || user.username }} {{ isCurrentUser(user) ? '(我)' : '' }}</div>
+              <div class="user-stats">{{ user.accuracy_rate }}% 正确率 · {{ user.total_questions }}题</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 正确率详情弹窗 -->
+    <div v-if="showAccuracyDetails" class="modal-overlay" @click="closeAccuracyModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>📊 个人正确率详情</h3>
+          <button class="close-btn" @click="closeAccuracyModal">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="detail-item">
+            <div class="detail-label">总体表现</div>
+            <div class="detail-value">
+              <span class="accuracy-rate">{{ overallAccuracy }}%</span>
+              <span class="detail-desc">{{ totalCorrect }}/{{ totalAnswers }} 题正确</span>
+            </div>
+          </div>
+          <div v-if="myStats.total_questions > 0" class="detail-item">
+            <div class="detail-label">参与题数</div>
+            <div class="detail-value">
+              <span class="accuracy-rate">{{ myStats.total_questions }}</span>
+              <span class="detail-desc">共 {{ lectureStats.questions_count || 0 }} 题</span>
             </div>
           </div>
           
-          <div class="question-content">
-            <div class="question-text">{{ questions[currentIndex].text }}</div>
-            
-            <div class="answer-section">
-              <div class="user-answer">
-                <span class="answer-label">您的答案：</span>
-                <span class="answer-value" :class="getUserAnswerClass(currentIndex)">
-                  {{ userAnswers[currentIndex] || '未作答' }}
-                </span>
-              </div>
-              
-              <div class="correct-answer">
-                <span class="answer-label">正确答案：</span>
-                <span class="answer-value correct">{{ questions[currentIndex].answer }}</span>
-              </div>
-            </div>
-            
-            <div class="feedback-section">
-              <div v-if="userAnswers[currentIndex] === questions[currentIndex].answer" class="feedback success">
-                <span class="feedback-icon">✅</span>
-                <span class="feedback-text">回答正确！</span>
-              </div>
-              <div v-else-if="userAnswers[currentIndex]" class="feedback error">
-                <span class="feedback-icon">❌</span>
-                <span class="feedback-text">回答错误</span>
-              </div>
-              <div v-else class="feedback skipped">
-                <span class="feedback-icon">⏭️</span>
-                <span class="feedback-text">未作答</span>
+          <!-- 分组统计信息 -->
+          <div v-if="groupStats.length > 0" class="group-stats-section">
+            <div class="group-stats-title">📊 各组表现</div>
+            <div class="group-stats-list">
+              <div v-for="group in groupStats" :key="group.group_id" class="group-stat-item">
+                <div class="group-info">
+                  <span class="group-name">第 {{ group.group_id }} 组</span>
+                  <span class="group-questions">({{ group.questions_count || 0 }} 题)</span>
+                </div>
+                <div class="group-metrics">
+                  <div class="group-metric">
+                    <span class="metric-label">正确率:</span>
+                    <span class="metric-value">{{ Math.round((group.correct_answers || 0) / Math.max(group.total_answers || 1, 1) * 100) }}%</span>
+                  </div>
+                  <div class="group-metric">
+                    <span class="metric-label">参与:</span>
+                    <span class="metric-value">{{ group.participants_count || 0 }}人</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
+    </div>
 
-        <!-- 题目进度指示器 -->
-        <div class="progress-indicators">
-          <div 
-            v-for="(question, index) in questions" 
-            :key="index"
-            class="progress-dot"
-            :class="{ active: index === currentIndex, ...getProgressDotClass(index) }"
-            @click="currentIndex = index"
-          >
-            {{ index + 1 }}
+    <!-- 完成率详情弹窗 -->
+    <div v-if="showCompletionDetails" class="modal-overlay" @click="closeCompletionModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>📝 个人完成率详情</h3>
+          <button class="close-btn" @click="closeCompletionModal">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="detail-item">
+            <div class="detail-label">完成情况</div>
+            <div class="detail-value">
+              <span class="completion-rate">{{ completionRate }}%</span>
+              <span class="detail-desc">{{ answeredQuestions }}/{{ totalQuestions }} 题作答</span>
+            </div>
+          </div>
+          <!-- 注释掉平均答题时间计算
+          <div v-if="myStats.avg_answer_time_ms" class="detail-item">
+            <div class="detail-label">平均答题时间</div>
+            <div class="detail-value">
+              <span class="completion-rate">{{ Math.round(myStats.avg_answer_time_ms / 1000) }}秒</span>
+              <span class="detail-desc">每题平均用时</span>
+            </div>
+          </div>
+          -->
+          
+          <!-- 分组完成情况 -->
+          <div v-if="groupStats.length > 0" class="group-stats-section">
+            <div class="group-stats-title">📝 各组完成情况</div>
+            <div class="group-stats-list">
+              <div v-for="group in groupStats" :key="group.group_id" class="group-stat-item">
+                <div class="group-info">
+                  <span class="group-name">第 {{ group.group_id }} 组</span>
+                  <span class="group-questions">({{ group.questions_count || 0 }} 题)</span>
+                </div>
+                <div class="group-metrics">
+                  <div class="group-metric">
+                    <span class="metric-label">完成率:</span>
+                    <span class="metric-value">{{ Math.round((group.total_answers || 0) / Math.max((group.questions_count || 1) * (group.participants_count || 1), 1) * 100) }}%</span>
+                  </div>
+                  <div class="group-metric">
+                    <span class="metric-label">参与:</span>
+                    <span class="metric-value">{{ group.participants_count || 0 }}人</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -111,43 +216,346 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { AuthManager } from '../../../../utils/auth'
 
-const questions = ref([
-  { text: 'Vue3的响应式原理基于什么？', answer: 'Proxy' },
-  { text: 'JavaScript的基本数据类型不包括？', answer: 'Class' }
-])
-const userAnswers = ref(['Proxy', '']) // 静态实例：只答了第一题
+// 响应式数据
+const loading = ref(true)
+const error = ref('')
+const lectureStats = ref<any>({})
+const groupStats = ref<any[]>([])
+const leaderboard = ref<any[]>([])
+const myAnswers = ref<any[]>([])
+const myStats = ref<any>({})
+const currentUserId = ref<number | null>(null)
 
-const correctCount = computed(() =>
-  questions.value.filter((q, i) => userAnswers.value[i] === q.answer).length
-)
+// 弹窗状态
+const showAccuracyDetails = ref(false)
+const showCompletionDetails = ref(false)
 
-const answeredCount = computed(() =>
-  userAnswers.value.filter(ans => ans !== '').length
-)
+// 计算属性
+const overallAccuracy = computed(() => {
+  // 使用个人统计数据而不是答题记录
+  if (myStats.value && myStats.value.total_questions > 0) {
+    return Math.round(myStats.value.accuracy_rate || 0)
+  }
+  // 如果没有统计数据，从答题记录计算
+  if (myAnswers.value.length === 0) return 0
+  const correct = myAnswers.value.filter(answer => answer.is_correct).length
+  return Math.round((correct / myAnswers.value.length) * 100)
+})
 
-const accuracy = computed(() =>
-  questions.value.length ? Math.round((correctCount.value / questions.value.length) * 100) : 0
-)
+const completionRate = computed(() => {
+  const totalQuestionsCount = lectureStats.value.questions_count || 0
+  if (totalQuestionsCount === 0) return 0
+  
+  // 使用个人统计数据
+  if (myStats.value && myStats.value.total_questions > 0) {
+    return Math.round((myStats.value.total_questions / totalQuestionsCount) * 100)
+  }
+  
+  // 备用计算方式
+  const answeredQuestionsCount = myAnswers.value.length
+  return Math.round((answeredQuestionsCount / totalQuestionsCount) * 100)
+})
 
-const answerRate = computed(() =>
-  questions.value.length ? Math.round((answeredCount.value / questions.value.length) * 100) : 0
-)
+const totalCorrect = computed(() => {
+  if (myStats.value && myStats.value.correct_answers !== undefined) {
+    return myStats.value.correct_answers
+  }
+  return myAnswers.value.filter(answer => answer.is_correct).length
+})
 
-const currentIndex = ref(0)
+const totalAnswers = computed(() => {
+  if (myStats.value && myStats.value.total_questions !== undefined) {
+    return myStats.value.total_questions
+  }
+  return myAnswers.value.length
+})
 
-function nextQuestion() {
-  if (currentIndex.value < questions.value.length - 1) currentIndex.value++
+const answeredQuestions = computed(() => {
+  if (myStats.value && myStats.value.total_questions !== undefined) {
+    return myStats.value.total_questions
+  }
+  return myAnswers.value.length
+})
+
+const totalQuestions = computed(() => {
+  return lectureStats.value.questions_count || 0
+})
+
+// 获取我在排行榜中的排名
+const myRank = computed(() => {
+  if (!currentUserId.value || !leaderboard.value.length) {
+    return null
+  }
+  
+  const index = leaderboard.value.findIndex(user => {
+    const userId = user.user_id || user.userId || user.id
+    return parseInt(userId) === parseInt(String(currentUserId.value || '0'))
+  })
+  
+  const rank = index >= 0 ? index + 1 : null
+  return rank
+})
+
+// 获取我的排行榜信息 
+const myRankInfo = computed(() => {
+  if (!currentUserId.value) {
+    return null
+  }
+  
+  // 优先使用个人统计数据
+  if (myStats.value && Object.keys(myStats.value).length > 0) {
+    return {
+      user_id: currentUserId.value,
+      accuracy_rate: myStats.value.accuracy_rate || 0,
+      total_questions: myStats.value.total_questions || 0,
+      correct_answers: myStats.value.correct_answers || 0
+    }
+  }
+  
+  // 备用：从排行榜中查找
+  if (leaderboard.value.length > 0) {
+    const userInLeaderboard = leaderboard.value.find(user => {
+      const userId = user.user_id || user.userId || user.id
+      return parseInt(userId) === parseInt(String(currentUserId.value || '0'))
+    })
+    return userInLeaderboard || null
+  }
+  
+  return null
+})
+
+// 获取当前讲座ID
+const getCurrentLectureId = () => {
+  return localStorage.getItem('currentLectureId') || sessionStorage.getItem('currentLectureId')
 }
 
-function prevQuestion() {
-  if (currentIndex.value > 0) currentIndex.value--
+// 获取当前用户ID
+const getCurrentUserId = () => {
+  const token = AuthManager.getToken()
+  if (!token) return null
+  
+  try {
+    // 方法1: 从localStorage获取用户信息
+    const userData = localStorage.getItem('user') || sessionStorage.getItem('user')
+    if (userData) {
+      const user = JSON.parse(userData)
+      const userId = user.id || user.userId || user.user_id
+      if (userId) return parseInt(userId)
+    }
+    
+    // 方法2: 从token解析（如果是JWT）
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const userId = payload.userId || payload.id || payload.user_id || payload.sub
+      if (userId) return parseInt(userId)
+    } catch (e) {
+      // 忽略token解析错误
+    }
+    
+    // 方法3: 从其他可能的存储位置获取
+    const storedUserId = localStorage.getItem('userId') || sessionStorage.getItem('userId')
+    if (storedUserId) {
+      return parseInt(storedUserId)
+    }
+    
+  } catch (e) {
+    // 忽略解析错误
+  }
+  
+  return null
+}
+
+// 获取成绩数据
+const fetchScoreData = async () => {
+  const lectureId = getCurrentLectureId()
+  console.log('=== ScorePage 调试信息 ===')
+  console.log('讲座ID:', lectureId)
+  
+  if (!lectureId) {
+    error.value = '未找到当前讲座信息'
+    loading.value = false
+    return
+  }
+
+  // 检查是否已登录且token有效
+  if (!AuthManager.isLoggedIn()) {
+    error.value = '登录已过期，请重新登录'
+    loading.value = false
+    // 可以考虑重定向到登录页面
+    // window.location.href = '/login'
+    return
+  }
+
+  const token = AuthManager.getToken()
+  console.log('Token存在:', !!token)
+  console.log('Token长度:', token?.length)
+  
+  if (!token) {
+    error.value = '请先登录'
+    loading.value = false
+    return
+  }
+
+  try {
+    loading.value = true
+    error.value = ''
+    
+    // 获取当前用户ID
+    currentUserId.value = getCurrentUserId()
+    console.log('当前用户ID:', currentUserId.value)
+
+    // 设置请求超时
+    const timeout = 10000 // 10秒超时
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+    const headers = { 'Authorization': `Bearer ${token}` }
+    console.log('请求头:', headers)
+
+    // 构建API URLs
+    const statsUrl = `/api/answers/lecture/${lectureId}/stats`
+    const leaderboardUrl = `/api/answers/lecture/${lectureId}/leaderboard?limit=100`
+    const myAnswersUrl = `/api/answers/lecture/${lectureId}/my-answers`
+    
+    console.log('API URLs:', { statsUrl, leaderboardUrl, myAnswersUrl })
+
+    // 并行获取数据
+    const [statsResponse, leaderboardResponse, myAnswersResponse] = await Promise.all([
+      // 获取讲座统计
+      fetch(statsUrl, {
+        headers,
+        signal: controller.signal
+      }).catch(err => {
+        console.error('Stats API网络错误:', err)
+        return { ok: false, status: 'network_error', error: err }
+      }),
+      // 获取完整排行榜（用于确定排名）
+      fetch(leaderboardUrl, {
+        headers,
+        signal: controller.signal
+      }).catch(err => {
+        console.error('Leaderboard API网络错误:', err)
+        return { ok: false, status: 'network_error', error: err }
+      }),
+      // 获取我的答题记录
+      fetch(myAnswersUrl, {
+        headers,
+        signal: controller.signal
+      }).catch(err => {
+        console.error('My answers API网络错误:', err)
+        return { ok: false, status: 'network_error', error: err }
+      })
+    ])
+
+    clearTimeout(timeoutId)
+    console.log('API响应状态:', {
+      stats: statsResponse.ok ? 'OK' : `错误 ${statsResponse.status}`,
+      leaderboard: leaderboardResponse.ok ? 'OK' : `错误 ${leaderboardResponse.status}`,
+      myAnswers: myAnswersResponse.ok ? 'OK' : `错误 ${myAnswersResponse.status}`
+    })
+
+    // 检查是否有401错误（token过期）
+    const hasAuthError = [statsResponse, leaderboardResponse, myAnswersResponse].some(
+      resp => resp.status === 401 || resp.status === 403
+    )
+    
+    if (hasAuthError) {
+      console.warn('检测到认证错误，清除认证信息')
+      AuthManager.clearAuth()
+      error.value = '登录已过期，请重新登录'
+      loading.value = false
+      return
+    }
+
+    // 处理统计数据
+    if (statsResponse.ok && 'json' in statsResponse) {
+      try {
+        const statsData = await statsResponse.json()
+        console.log('Stats数据:', statsData)
+        if (statsData.success) {
+          lectureStats.value = statsData.data.lectureStats
+          groupStats.value = statsData.data.groupStats || []
+        }
+      } catch (parseError) {
+        console.error('Stats数据解析失败:', parseError)
+      }
+    } else {
+      console.warn('Stats API失败:', statsResponse)
+    }
+
+    // 处理排行榜数据
+    if (leaderboardResponse.ok && 'json' in leaderboardResponse) {
+      try {
+        const leaderboardData = await leaderboardResponse.json()
+        console.log('Leaderboard数据:', leaderboardData)
+        if (leaderboardData.success) {
+          leaderboard.value = leaderboardData.data || []
+        }
+      } catch (parseError) {
+        console.error('Leaderboard数据解析失败:', parseError)
+      }
+    } else {
+      console.warn('Leaderboard API失败:', leaderboardResponse)
+    }
+
+    // 处理个人答题数据
+    if (myAnswersResponse.ok && 'json' in myAnswersResponse) {
+      try {
+        const myAnswersData = await myAnswersResponse.json()
+        console.log('My answers数据:', myAnswersData)
+        if (myAnswersData.success) {
+          myAnswers.value = myAnswersData.data.answers || []
+          myStats.value = myAnswersData.data.stats || {}
+        }
+      } catch (parseError) {
+        console.error('My answers数据解析失败:', parseError)
+      }
+    } else {
+      console.warn('My answers API失败:', myAnswersResponse)
+    }
+
+    // 如果所有API都失败了，显示错误
+    if (!statsResponse.ok && !leaderboardResponse.ok && !myAnswersResponse.ok) {
+      error.value = '无法获取数据，请检查网络连接或稍后重试'
+      console.error('所有API都失败了')
+    }
+
+  } catch (err: any) {
+    console.error('fetchScoreData异常:', err)
+    if (err.name === 'AbortError') {
+      error.value = '请求超时，请稍后重试'
+    } else {
+      error.value = err.message || '获取数据失败，请稍后重试'
+    }
+  } finally {
+    loading.value = false
+    console.log('=== fetchScoreData 完成 ===')
+  }
+}
+
+// 弹窗控制
+const showAccuracyModal = () => {
+  showAccuracyDetails.value = true
+}
+
+const closeAccuracyModal = () => {
+  showAccuracyDetails.value = false
+}
+
+const showCompletionModal = () => {
+  showCompletionDetails.value = true
+}
+
+const closeCompletionModal = () => {
+  showCompletionDetails.value = false
 }
 
 // 获取表现等级样式
-function getPerformanceClass() {
-  const acc = accuracy.value
+const getPerformanceClass = () => {
+  const acc = overallAccuracy.value
   if (acc >= 90) return 'excellent'
   if (acc >= 80) return 'good'
   if (acc >= 70) return 'fair'
@@ -155,8 +563,8 @@ function getPerformanceClass() {
 }
 
 // 获取表现等级
-function getPerformanceLevel() {
-  const acc = accuracy.value
+const getPerformanceLevel = () => {
+  const acc = overallAccuracy.value
   if (acc >= 90) return 'A'
   if (acc >= 80) return 'B'
   if (acc >= 70) return 'C'
@@ -164,37 +572,38 @@ function getPerformanceLevel() {
 }
 
 // 获取表现描述
-function getPerformanceDesc() {
-  const acc = accuracy.value
+const getPerformanceDesc = () => {
+  const acc = overallAccuracy.value
   if (acc >= 90) return '优秀'
   if (acc >= 80) return '良好'
   if (acc >= 70) return '及格'
   return '需改进'
 }
 
-// 获取题目结果样式
-function getQuestionResultClass(index: number) {
-  if (!userAnswers.value[index]) return 'skipped'
-  return userAnswers.value[index] === questions.value[index].answer ? 'correct' : 'incorrect'
+// 获取排名样式
+const getRankClass = (index: number) => {
+  if (index === 0) return 'rank-gold'
+  if (index === 1) return 'rank-silver'
+  if (index === 2) return 'rank-bronze'
+  return 'rank-normal'
 }
 
-// 获取题目结果文本
-function getQuestionResultText(index: number) {
-  if (!userAnswers.value[index]) return '未作答'
-  return userAnswers.value[index] === questions.value[index].answer ? '正确' : '错误'
+// 判断是否是当前用户
+const isCurrentUser = (user: any) => {
+  if (!currentUserId.value) return false
+  const userId = user.user_id || user.userId || user.id
+  return parseInt(userId) === parseInt(String(currentUserId.value || '0'))
 }
 
-// 获取用户答案样式
-function getUserAnswerClass(index: number) {
-  if (!userAnswers.value[index]) return 'unanswered'
-  return userAnswers.value[index] === questions.value[index].answer ? 'correct' : 'incorrect'
+// 强制停止加载（用于紧急情况）
+const forceStopLoading = () => {
+  loading.value = false
 }
 
-// 获取进度点样式
-function getProgressDotClass(index: number) {
-  if (!userAnswers.value[index]) return { skipped: true }
-  return userAnswers.value[index] === questions.value[index].answer ? { correct: true } : { incorrect: true }
-}
+// 组件挂载时获取数据
+onMounted(() => {
+  fetchScoreData()
+})
 </script>
 
 <style scoped>
@@ -249,6 +658,64 @@ function getProgressDotClass(index: number) {
   opacity: 0.8;
 }
 
+/* 加载和错误状态 */
+.loading-container {
+  text-align: center;
+  padding: 3rem;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #10a37f;
+  border-radius: 50%;
+  margin: 0 auto 1rem;
+  animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.error-container {
+  text-align: center;
+  padding: 3rem;
+}
+
+.error-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.error-text {
+  color: #ef4444;
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.retry-btn {
+  background: #10a37f;
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.retry-btn:hover {
+  background: #059669;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 .score-overview {
   margin-bottom: 2.5rem;
 }
@@ -268,10 +735,26 @@ function getProgressDotClass(index: number) {
   border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 4px 20px rgba(16, 163, 127, 0.1);
   transition: transform 0.3s ease;
+  position: relative;
 }
 
 .stat-card:hover {
   transform: translateY(-4px);
+}
+
+.stat-card.clickable {
+  cursor: pointer;
+}
+
+.stat-card.clickable:hover {
+  box-shadow: 0 6px 25px rgba(16, 163, 127, 0.15);
+}
+
+.click-hint {
+  font-size: 0.7rem;
+  color: #059669;
+  margin-top: 0.5rem;
+  opacity: 0.8;
 }
 
 .stat-icon {
@@ -321,8 +804,132 @@ function getProgressDotClass(index: number) {
   color: #ef4444;
 }
 
-.questions-section {
-  margin-top: 2rem;
+/* 分组统计 */
+.groups-section {
+  margin-bottom: 2.5rem;
+}
+
+/* 我的排名 */
+.my-ranking-section {
+  margin-bottom: 2.5rem;
+}
+
+.my-rank-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 20px rgba(16, 163, 127, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.rank-display {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.rank-number {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: white;
+}
+
+.rank-number.rank-gold {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  box-shadow: 0 4px 15px rgba(251, 191, 36, 0.4);
+}
+
+.rank-number.rank-silver {
+  background: linear-gradient(135deg, #e5e7eb 0%, #9ca3af 100%);
+  box-shadow: 0 4px 15px rgba(156, 163, 175, 0.4);
+}
+
+.rank-number.rank-bronze {
+  background: linear-gradient(135deg, #d97706 0%, #92400e 100%);
+  box-shadow: 0 4px 15px rgba(217, 119, 6, 0.4);
+}
+
+.rank-number.rank-normal {
+  background: linear-gradient(135deg, #10a37f 0%, #059669 100%);
+  box-shadow: 0 4px 15px rgba(16, 163, 127, 0.4);
+}
+
+.rank-info {
+  text-align: left;
+}
+
+.rank-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #10a37f;
+  margin-bottom: 0.2rem;
+}
+
+.rank-total {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.rank-stats {
+  display: flex;
+  gap: 2rem;
+  margin-left: auto;
+}
+
+.rank-stat {
+  text-align: center;
+}
+
+.rank-stat .stat-value {
+  display: block;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #059669;
+  margin-bottom: 0.2rem;
+}
+
+.rank-stat .stat-label {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.no-rank-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 20px rgba(16, 163, 127, 0.1);
+  text-align: center;
+}
+
+.no-rank-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.6;
+}
+
+.no-rank-text {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+
+.no-rank-desc {
+  font-size: 0.9rem;
+  color: #9ca3af;
 }
 
 .section-title {
@@ -335,240 +942,337 @@ function getProgressDotClass(index: number) {
   gap: 0.5rem;
 }
 
-.question-navigation {
+.groups-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.group-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 10px rgba(16, 163, 127, 0.08);
+}
+
+.group-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.6);
-  border-radius: 12px;
+  margin-bottom: 1rem;
 }
 
-.nav-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.current-question {
+.group-title {
   font-size: 1.1rem;
   font-weight: 600;
   color: #10a37f;
 }
 
-.total-questions {
+.group-questions {
   font-size: 0.9rem;
   color: #6b7280;
+  background: rgba(16, 163, 127, 0.1);
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
 }
 
-.nav-buttons {
+.group-stats {
   display: flex;
-  gap: 0.5rem;
+  justify-content: space-around;
+  gap: 1rem;
 }
 
-.nav-btn {
+.group-stat {
+  text-align: center;
+}
+
+.group-stat .stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #059669;
+  margin-bottom: 0.2rem;
+}
+
+.group-stat .stat-label {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* 排行榜 */
+.leaderboard-section {
+  margin-bottom: 2rem;
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.leaderboard-item {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.5rem 1rem;
-  background: #10a37f;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
+  gap: 1rem;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 10px rgba(16, 163, 127, 0.08);
   transition: all 0.3s ease;
 }
 
-.nav-btn:hover {
-  background: #059669;
-  transform: translateY(-1px);
+.leaderboard-item.is-me {
+  background: rgba(16, 163, 127, 0.1);
+  border: 2px solid rgba(16, 163, 127, 0.3);
+  box-shadow: 0 4px 20px rgba(16, 163, 127, 0.15);
+  transform: scale(1.02);
 }
 
-.nav-btn:disabled {
-  background: #9ca3af;
-  cursor: not-allowed;
-  transform: none;
+.leaderboard-item.is-me .username {
+  color: #10a37f;
+  font-weight: 700;
 }
 
-.question-card {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 4px 20px rgba(16, 163, 127, 0.1);
-}
-
-.question-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.question-number {
-  background: linear-gradient(135deg, #10a37f 0%, #059669 100%);
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.result-badge {
-  padding: 0.4rem 1rem;
-  border-radius: 15px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: white;
-}
-
-.result-badge.correct {
-  background: #059669;
-}
-
-.result-badge.incorrect {
-  background: #ef4444;
-}
-
-.result-badge.skipped {
-  background: #6b7280;
-}
-
-.question-text {
-  font-size: 1.2rem;
-  font-weight: 600;
+.leaderboard-item.is-me .user-stats {
   color: #047857;
-  margin-bottom: 1.5rem;
-  line-height: 1.5;
 }
 
-.answer-section {
-  margin-bottom: 1.5rem;
-}
-
-.user-answer,
-.correct-answer {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.8rem;
-  padding: 0.8rem;
-  background: rgba(255, 255, 255, 0.6);
-  border-radius: 8px;
-}
-
-.answer-label {
-  font-weight: 600;
-  color: #374151;
-  min-width: 80px;
-}
-
-.answer-value {
-  font-weight: 600;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-}
-
-.answer-value.correct {
-  color: #059669;
-  background: rgba(5, 150, 105, 0.1);
-}
-
-.answer-value.incorrect {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
-}
-
-.answer-value.unanswered {
-  color: #6b7280;
-  background: rgba(107, 114, 128, 0.1);
-}
-
-.feedback-section {
-  padding: 1rem;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.8);
-}
-
-.feedback {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-}
-
-.feedback.success {
-  color: #059669;
-}
-
-.feedback.error {
-  color: #ef4444;
-}
-
-.feedback.skipped {
-  color: #6b7280;
-}
-
-.feedback-icon {
-  font-size: 1.1rem;
-}
-
-.progress-indicators {
-  display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 1.5rem;
-}
-
-.progress-dot {
-  width: 40px;
-  height: 40px;
+.rank-badge {
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: white;
+}
+
+.rank-badge.rank-gold {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+}
+
+.rank-badge.rank-silver {
+  background: linear-gradient(135deg, #e5e7eb 0%, #9ca3af 100%);
+}
+
+.rank-badge.rank-bronze {
+  background: linear-gradient(135deg, #d97706 0%, #92400e 100%);
+}
+
+.rank-badge.rank-normal {
+  background: linear-gradient(135deg, #10a37f 0%, #059669 100%);
+}
+
+.user-info {
+  flex: 1;
+}
+
+.username {
+  font-size: 1rem;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border: 2px solid #e5e7eb;
-  background: white;
+  color: #374151;
+  margin-bottom: 0.2rem;
+}
+
+.user-stats {
+  font-size: 0.8rem;
   color: #6b7280;
 }
 
-.progress-dot.active {
-  border-color: #10a37f;
-  background: #10a37f;
-  color: white;
-  transform: scale(1.1);
+/* 弹窗样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
 }
 
-.progress-dot.correct {
-  border-color: #059669;
-  background: #059669;
-  color: white;
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 0;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: modalFadeIn 0.3s ease-out;
 }
 
-.progress-dot.incorrect {
-  border-color: #ef4444;
-  background: #ef4444;
-  color: white;
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
-.progress-dot.skipped {
-  border-color: #9ca3af;
-  background: #9ca3af;
-  color: white;
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
 }
 
-.progress-dot:hover {
-  transform: scale(1.05);
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #10a37f;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6b7280;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.modal-body {
+  padding: 1.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: rgba(16, 163, 127, 0.05);
+  border-radius: 8px;
+  margin-bottom: 0.8rem;
+}
+
+.detail-item:last-child {
+  margin-bottom: 0;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: #374151;
+}
+
+.detail-value {
+  text-align: right;
+}
+
+.accuracy-rate,
+.completion-rate {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #059669;
+  margin-bottom: 0.2rem;
+}
+
+.detail-desc {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* 分组统计弹窗样式 */
+.group-stats-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.group-stats-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #10a37f;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.group-stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.group-stat-item {
+  background: rgba(16, 163, 127, 0.05);
+  border-radius: 8px;
+  padding: 0.8rem;
+  border: 1px solid rgba(16, 163, 127, 0.1);
+}
+
+.group-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.group-name {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.group-questions {
+  font-size: 0.8rem;
+  color: #6b7280;
+  background: rgba(16, 163, 127, 0.1);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+
+.group-metrics {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.group-metric {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.metric-label {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.metric-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #059669;
 }
 
 /* 动画效果 */
@@ -618,34 +1322,61 @@ function getProgressDotClass(index: number) {
     grid-template-columns: 1fr;
   }
   
-  .question-navigation {
-    flex-direction: column;
-    gap: 1rem;
+  .groups-grid {
+    grid-template-columns: 1fr;
   }
   
-  .nav-buttons {
-    width: 100%;
+  .group-stats {
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  
+  .my-rank-card {
+    flex-direction: column;
+    text-align: center;
+    gap: 1.5rem;
+  }
+  
+  .rank-display {
+    justify-content: center;
+  }
+  
+  .rank-stats {
+    margin-left: 0;
+    justify-content: center;
+  }
+  
+  .modal-content {
+    width: 95%;
+    margin: 1rem;
+  }
+  
+  .modal-header {
+    padding: 1rem;
+  }
+  
+  .modal-body {
+    padding: 1rem;
+  }
+  
+  .detail-item {
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: center;
+  }
+  
+  .detail-value {
+    text-align: center;
+  }
+  
+  /* 移动端分组统计样式调整 */
+  .group-metrics {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .group-metric {
     justify-content: space-between;
-  }
-  
-  .question-card {
-    padding: 1.5rem;
-  }
-  
-  .question-header {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
-  }
-  
-  .progress-indicators {
-    gap: 0.3rem;
-  }
-  
-  .progress-dot {
-    width: 32px;
-    height: 32px;
-    font-size: 0.7rem;
   }
 }
 </style>

@@ -31,11 +31,24 @@
               <div class="user-info">
                 <span class="user-avatar">👤</span>
                 <span class="user-name">{{ comment.userName }}</span>
-                <span class="user-badge" v-if="comment.userName === speakerName">演讲者</span>
+                <span class="user-badge" v-if="isSpeakerMessage(comment)">演讲者</span>
+                <span class="user-badge current-user" v-if="isCurrentUserMessage(comment)">我</span>
+                <span class="announcement-badge" v-if="comment.isAnnouncement">📢 公告</span>
+                <span class="pinned-badge" v-if="comment.isPinned">📌 置顶</span>
               </div>
               <span class="comment-time">{{ formatTime(comment.time) }}</span>
             </div>
             <div class="comment-body">{{ comment.text }}</div>
+            <div class="comment-actions">
+              <button @click="toggleLike(comment)" :class="{ liked: comment.isLikedByUser }" class="like-btn">
+                👍 {{ comment.likesCount || 0 }}
+              </button>
+              <!-- 只有自己发的消息才显示置顶和删除按钮 -->
+              <button v-if="isCurrentUserMessage(comment)" @click="togglePin(comment)" class="pin-btn">
+                {{ comment.isPinned ? '取消置顶' : '置顶' }}
+              </button>
+              <button v-if="isCurrentUserMessage(comment)" @click="deleteComment(comment)" class="delete-btn">删除</button>
+            </div>
           </div>
         </div>
       </div>
@@ -72,9 +85,9 @@
             ></textarea>
           </div>
           <div class="form-actions">
-            <button type="submit" class="submit-btn" :disabled="!newComment.text.trim()">
-              <span class="btn-icon">📤</span>
-              发表观点
+            <button type="submit" class="submit-btn" :disabled="!newComment.text.trim() || isSubmitting">
+              <span class="btn-icon">{{ isSubmitting ? '⏳' : '📤' }}</span>
+              {{ isSubmitting ? '发送中...' : '发表观点' }}
             </button>
           </div>
         </form>
@@ -84,42 +97,104 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import axios from 'axios'
 
 const route = useRoute()
 const lectureId = route.params.id
 
 const loading = ref(true)
-const speakerName = '演讲者本人'
+const comments = ref<any[]>([])
+const newComment = ref({ text: '' })
+const currentUser = ref<any>(null)
+const currentLecture = ref<any>(null)
+const isSubmitting = ref(false)
+
+// 轮询相关
+let pollInterval: NodeJS.Timeout | null = null
+const POLL_INTERVAL = 3000 // 3秒轮询一次
+
+// 获取当前用户信息
+const getCurrentUser = () => {
+  try {
+    // 尝试从 localStorage 或 sessionStorage 获取用户信息
+    let userData = localStorage.getItem('user') || sessionStorage.getItem('user')
+    
+    if (userData) {
+      const user = JSON.parse(userData)
+      return user
+    }
+    
+    // 尝试从其他存储位置获取
+    const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId')
+    const username = localStorage.getItem('username') || sessionStorage.getItem('username')
+    
+    if (userId) {
+      const userInfo = {
+        id: parseInt(userId) || userId,
+        username: username
+      }
+      return userInfo
+    }
+    
+    // 检查JWT token中是否包含用户信息
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    if (token) {
+      try {
+        // 尝试解析JWT token
+        const tokenParts = token.split('.')
+        if (tokenParts.length === 3) {
+          const payload = JSON.parse(atob(tokenParts[1]))
+          if (payload.id || payload.userId) {
+            const userFromToken = {
+              id: payload.id || payload.userId,
+              username: payload.username || payload.name
+            }
+            return userFromToken
+          }
+        }
+      } catch (tokenError) {
+        console.error('解析token失败:', tokenError)
+      }
+    }
+    
+    return null
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+    return null
+  }
+}
 
 // 获取当前讲座信息
-const getCurrentLecture = () => {
-  const currentLectureId = localStorage.getItem('currentLectureId')
-  if (currentLectureId && currentLectureId === lectureId) {
-    // 模拟讲座数据，实际应该从API获取
-    return {
-      id: lectureId,
-      title: 'AI与机器学习前沿技术',
-      speaker: '张教授',
-      startTime: new Date(2024, 11, 25, 14, 0),
-      endTime: new Date(2024, 11, 25, 16, 0),
-      status: 'active'
+const getCurrentLecture = async () => {
+  try {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    if (!token) return null
+    
+    const response = await axios.get(`/api/lectures/${lectureId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    if (response.data && response.data.lecture) {
+      return response.data.lecture
     }
+    return null
+  } catch (error) {
+    console.error('获取讲座信息失败:', error)
+    return null
   }
-  return null
 }
 
 // 检查讲座状态
 const checkLectureStatus = () => {
-  const lecture = getCurrentLecture()
-  if (!lecture) return { ended: false, upcoming: false, active: false }
+  if (!currentLecture.value) return { ended: false, upcoming: false, active: false }
   
-  const now = new Date()
+  const status = currentLecture.value.status
   return {
-    ended: now > lecture.endTime,
-    upcoming: now < lecture.startTime,
-    active: now >= lecture.startTime && now <= lecture.endTime
+    ended: status === 2,
+    upcoming: status === 0,
+    active: status === 1
   }
 }
 
@@ -128,61 +203,244 @@ const isLectureEnded = computed(() => lectureStatus.value.ended)
 const isLectureUpcoming = computed(() => lectureStatus.value.upcoming)
 const isLectureActive = computed(() => lectureStatus.value.active)
 
-// 只显示当前讲座的评论数据
-const comments = ref([
-  { 
-    id: 1, 
-    userName: '张同学', 
-    text: '这个讲座内容很有深度，特别是关于AI技术发展趋势的分析！', 
-    time: new Date(Date.now() - 300000) 
-  },
-  { 
-    id: 2, 
-    userName: '李老师', 
-    text: '演讲者的观点很独特，对我的研究很有启发。', 
-    time: new Date(Date.now() - 180000) 
-  },
-  { 
-    id: 3, 
-    userName: '王学生', 
-    text: '希望能多分享一些实际应用案例，谢谢！', 
-    time: new Date(Date.now() - 120000) 
+// 获取讨论消息
+const loadDiscussionMessages = async () => {
+  try {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    if (!token) return
+    
+    const response = await axios.get(`/api/discussion/lecture/${lectureId}/messages`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    if (response.data && response.data.success && response.data.data && response.data.data.messages) {
+      comments.value = response.data.data.messages.map((msg: any) => ({
+        id: msg.id,
+        userName: msg.username || '匿名用户',
+        text: msg.message,
+        time: new Date(msg.created_at),
+        isAnnouncement: msg.message_type === 'announcement',
+        isPinned: msg.is_pinned || false,
+        likesCount: msg.like_count || 0,
+        isLikedByUser: msg.isLikedByUser || false,
+        userId: msg.user_id,
+        userRole: msg.user_role
+      })).sort((a: any, b: any) => {
+        // 置顶消息优先，然后按时间排序
+        if (a.isPinned && !b.isPinned) return -1
+        if (!a.isPinned && b.isPinned) return 1
+        return b.time.getTime() - a.time.getTime()
+      })
+    } else {
+      comments.value = []
+    }
+  } catch (error) {
+    console.error('加载讨论消息失败:', error)
   }
-])
-
-const newComment = ref({ text: '' })
-
-const submitComment = () => {
-  if (!newComment.value.text.trim()) return
-  
-  comments.value.push({
-    id: Date.now(),
-    userName: speakerName,
-    text: newComment.value.text,
-    time: new Date()
-  })
-  
-  newComment.value.text = ''
 }
 
+// 提交新的讨论消息
+const submitComment = async () => {
+  if (!newComment.value.text.trim() || isSubmitting.value) return
+  
+  isSubmitting.value = true
+  
+  try {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    if (!token) {
+      console.error('未找到认证令牌')
+      return
+    }
+    
+    const response = await axios.post(`/api/discussion/lecture/${lectureId}/message`, {
+      message: newComment.value.text.trim()
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    if (response.data && response.data.success) {
+      newComment.value.text = ''
+      // 立即刷新消息列表
+      await loadDiscussionMessages()
+    }
+  } catch (error) {
+    console.error('提交讨论消息失败:', error)
+    if (error.response) {
+      console.error('错误响应:', error.response.data)
+    }
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+// 开始轮询新消息
+const startPolling = () => {
+  if (pollInterval) return
+  
+  pollInterval = setInterval(async () => {
+    if (!isLectureEnded.value) {
+      await loadDiscussionMessages()
+    }
+  }, POLL_INTERVAL)
+}
+
+// 停止轮询
+const stopPolling = () => {
+  if (pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
+}
+
+// 格式化时间显示
 const formatTime = (time: Date) => {
   const now = new Date()
   const diff = now.getTime() - time.getTime()
   const minutes = Math.floor(diff / 60000)
   const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
   
   if (minutes < 1) return '刚刚'
   if (minutes < 60) return `${minutes}分钟前`
   if (hours < 24) return `${hours}小时前`
+  if (days < 7) return `${days}天前`
   return time.toLocaleDateString('zh-CN')
 }
 
+// 检查是否是当前用户的消息
+const isCurrentUserMessage = (message: any) => {
+  if (!currentUser.value || !message.userId) return false
+  
+  // 尝试多种ID比较方式
+  const currentUserId = currentUser.value.id
+  const messageUserId = message.userId
+  
+  // 尝试严格相等、松散相等、字符串比较
+  return currentUserId === messageUserId || 
+         currentUserId == messageUserId || 
+         String(currentUserId) === String(messageUserId)
+}
+
+// 检查是否是演讲者
+const isSpeakerMessage = (message: any) => {
+  return currentLecture.value && message.userId === currentLecture.value.speaker_id
+}
+
+// 检查当前用户是否是演讲者
+const isCurrentUserSpeaker = () => {
+  if (!currentUser.value || !currentLecture.value) return false
+  
+  const currentUserId = currentUser.value.id
+  const speakerId = currentLecture.value.speaker_id
+  
+  return currentUserId === speakerId || 
+         currentUserId == speakerId || 
+         String(currentUserId) === String(speakerId)
+}
+
+// 点赞/取消点赞
+const toggleLike = async (comment: any) => {
+  try {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    if (!token) {
+      console.error('未找到认证令牌')
+      return
+    }
+    
+    const response = await axios.post(`/api/discussion/message/${comment.id}/like`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    if (response.data && response.data.success) {
+      // 重新加载消息列表以更新点赞状态
+      await loadDiscussionMessages()
+    }
+  } catch (error) {
+    console.error('点赞操作失败:', error)
+  }
+}
+
+// 置顶/取消置顶（仅演讲者可操作）
+const togglePin = async (comment: any) => {
+  try {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    if (!token) {
+      console.error('未找到认证令牌')
+      return
+    }
+    
+    const response = await axios.post(`/api/discussion/lecture/${lectureId}/message/${comment.id}/pin`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    if (response.data && response.data.success) {
+      // 重新加载消息列表以更新置顶状态
+      await loadDiscussionMessages()
+    }
+  } catch (error) {
+    console.error('置顶操作失败:', error)
+  }
+}
+
+// 删除消息（仅自己的消息）
+const deleteComment = async (comment: any) => {
+  if (!confirm('确定要删除这条消息吗？')) return
+  
+  try {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    if (!token) {
+      console.error('未找到认证令牌')
+      return
+    }
+    
+    const response = await axios.delete(`/api/discussion/lecture/${lectureId}/message/${comment.id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    if (response.data && response.data.success) {
+      // 重新加载消息列表以移除已删除的消息
+      await loadDiscussionMessages()
+    }
+  } catch (error) {
+    console.error('删除消息失败:', error)
+  }
+}
+
+// 初始化数据
+const initializeData = async () => {
+  loading.value = true
+  
+  try {
+    // 获取用户信息
+    currentUser.value = getCurrentUser()
+    
+    // 获取讲座信息
+    currentLecture.value = await getCurrentLecture()
+    
+    // 加载讨论消息
+    await loadDiscussionMessages()
+    
+    // 开始轮询
+    if (!isLectureEnded.value) {
+      startPolling()
+    }
+  } catch (error) {
+    console.error('初始化数据失败:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 生命周期钩子
 onMounted(() => {
-  setTimeout(() => { 
-    loading.value = false 
-  }, 400)
+  initializeData()
+})
+
+onUnmounted(() => {
+  stopPolling()
 })
 </script>
+
 
 <style scoped>
 /* 容器样式 */
@@ -366,6 +624,28 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.user-badge.current-user {
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+}
+
+.announcement-badge {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  padding: 0.1rem 0.5rem;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.pinned-badge {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  padding: 0.1rem 0.5rem;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
 .comment-time {
   color: #6b7280;
   font-size: 0.8rem;
@@ -375,6 +655,66 @@ onMounted(() => {
   color: #374151;
   line-height: 1.6;
   font-size: 0.95rem;
+  margin-bottom: 0.8rem;
+}
+
+.comment-actions {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: flex-end;
+}
+
+.like-btn, .pin-btn, .delete-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.like-btn {
+  background: linear-gradient(135deg, #e0f2fe 0%, #d1eefd 100%);
+  color: #10a37f;
+  border: 1px solid #10a37f;
+}
+
+.like-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #cce6ff 0%, #b8e0ff 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(16, 163, 127, 0.1);
+}
+
+.like-btn.liked {
+  background: linear-gradient(135deg, #10a37f 0%, #059669 100%);
+  color: white;
+  border: none;
+}
+
+.pin-btn {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  color: #d97706;
+  border: 1px solid #d97706;
+}
+
+.pin-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #fef9c3 0%, #fde68a 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.1);
+}
+
+.delete-btn {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #991b1b;
+  border: 1px solid #991b1b;
+}
+
+.delete-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(153, 27, 27, 0.1);
 }
 
 /* 评论表单区域 */
@@ -581,6 +921,16 @@ onMounted(() => {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
+  }
+  
+  .comment-actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .like-btn, .pin-btn, .delete-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
   }
   
   .submit-btn {

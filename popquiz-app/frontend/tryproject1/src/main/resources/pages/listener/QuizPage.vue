@@ -4,6 +4,30 @@
       <div class="title-icon animate-bounce">📝</div>
       <h2 class="quiz-title animate-fade-in">答题区域</h2>
       <p class="subtitle animate-fade-in-delay">参与互动，检验学习成果</p>
+      
+      <!-- 题目统计信息 -->
+      <div v-if="quizGroups.length > 0" class="quiz-stats">
+        <div class="stats-item">
+          <span class="stats-label">题目组数:</span>
+          <span class="stats-value">{{ quizGroups.length }}</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">总题目数:</span>
+          <span class="stats-value">{{ totalQuestions }}</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">已完成:</span>
+          <span class="stats-value">{{ completedQuestions }}</span>
+        </div>
+      </div>
+      
+      <!-- 调试信息 -->
+      <div v-if="userAnswers.size > 0" class="debug-info" style="margin-top: 1rem; padding: 0.5rem; background: rgba(0,0,0,0.1); border-radius: 8px; font-size: 0.8rem;">
+        <div><strong>调试信息:</strong></div>
+        <div>已答题目ID: {{ Array.from(userAnswers.keys()).join(', ') }}</div>
+        <div>当前题目ID: {{ currentQuestion?.id }}</div>
+        <div>当前题目是否已完成: {{ currentQuestion ? isQuestionCompleted(currentQuestion.id) : 'N/A' }}</div>
+      </div>
     </div>
 
     <!-- 讲座已结束提示 -->
@@ -32,55 +56,87 @@
     <div v-else>
       <div v-if="loading" class="loading-container">
         <div class="loading-spinner"></div>
-        <p>AI正在生成题目，请稍候...</p>
+        <p>正在加载题目，请稍候...</p>
       </div>
       
-      <div v-else-if="currentQuestion" class="quiz-content">
+      <!-- 无题目状态 -->
+      <div v-else-if="availableQuestions.length === 0" class="no-quiz-state">
+        <div class="no-quiz-icon">📭</div>
+        <h3>暂无可答题目</h3>
+        <p>讲师还未发布题目，请耐心等待...</p>
+      </div>
+      
+      <!-- 单题目显示模式 -->
+      <div v-else class="quiz-content">
         <div class="question-card">
+          <!-- 题目进度 -->
           <div class="question-header">
-            <div class="question-number">题目 {{ currentIndex + 1 }}</div>
+            <div class="question-number">
+              题目 {{ getCurrentQuestionIndex() + 1 }} / {{ totalQuestions }}
+            </div>
             <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: `${((currentIndex + 1) / questions.length) * 100}%` }"></div>
+              <div class="progress-fill" :style="{ width: getProgressPercentage() + '%' }"></div>
             </div>
           </div>
           
-          <div class="question-text">{{ currentQuestion.text }}</div>
-          
-          <div class="options-container">
-            <label v-for="(opt, idx) in currentQuestion.options" :key="idx" class="option-item" :class="{ selected: userAnswer === opt, disabled: answered }">
-              <input type="radio" :value="opt" v-model="userAnswer" :disabled="answered" />
-              <span class="option-content">{{ opt }}</span>
-              <span class="option-indicator"></span>
-            </label>
-          </div>
-          
-          <div v-if="answered" class="feedback-section">
-            <div v-if="isCorrect" class="feedback-correct">
-              <span class="feedback-icon">✅</span>
-              <span>回答正确！</span>
+          <!-- 当前题目内容 -->
+          <div v-if="currentQuestion" class="current-question">
+            <div class="question-text">{{ currentQuestion.question }}</div>
+            
+            <div class="options-container">
+              <label v-for="(option, optIndex) in getQuestionOptions(currentQuestion)" :key="optIndex" 
+                     class="option-item" 
+                     :class="{ selected: userAnswer === option, disabled: isQuestionCompleted(currentQuestion.id) }">
+                <input type="radio" :value="option" v-model="userAnswer" :disabled="isQuestionCompleted(currentQuestion.id)" />
+                <span class="option-content">{{ option }}</span>
+                <span class="option-indicator"></span>
+              </label>
             </div>
-            <div v-else class="feedback-wrong">
-              <span class="feedback-icon">❌</span>
-              <span>回答错误，正确答案是：{{ currentQuestion.answer }}</span>
+            
+            <!-- 答题反馈 -->
+            <div v-if="showFeedback && isQuestionCompleted(currentQuestion.id)" class="feedback-section">
+              <div v-if="getQuestionResult(currentQuestion.id)?.isCorrect" class="feedback-correct">
+                <span class="feedback-icon">✅</span>
+                <span>回答正确！</span>
+              </div>
+              <div v-else class="feedback-wrong">
+                <span class="feedback-icon">❌</span>
+                <span>回答错误，正确答案是：{{ getCorrectAnswer(currentQuestion) }}</span>
+              </div>
             </div>
-          </div>
-          
-          <div class="action-buttons">
-            <button v-if="!isLast" @click="nextQuestion" :disabled="!userAnswer" class="action-btn primary">
-              <span>下一题</span>
-              <span class="btn-icon">→</span>
-            </button>
-            <button v-else @click="submitPaper" :disabled="!userAnswer" class="action-btn submit">
-              <span class="btn-icon">📝</span>
-              <span>提交试卷</span>
-            </button>
+            
+            <!-- 操作按钮 -->
+            <div class="action-buttons">
+              <button v-if="currentQuestionIndex > 0" 
+                      @click="goToPreviousQuestion" 
+                      class="action-btn secondary">
+                <span class="btn-icon">←</span>
+                <span>上一题</span>
+              </button>
+              
+              <button v-if="!isQuestionCompleted(currentQuestion.id)" 
+                      @click="submitAnswer(currentQuestion)" 
+                      :disabled="!userAnswer" 
+                      class="action-btn primary">
+                <span class="btn-icon">✓</span>
+                <span>提交答案</span>
+              </button>
+              
+              <button v-if="currentQuestionIndex < totalQuestions - 1" 
+                      @click="goToNextQuestion(currentQuestion)" 
+                      class="action-btn secondary">
+                <span>下一题</span>
+                <span class="btn-icon">→</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
       
-      <div v-else class="completion-state">
+      <!-- 全部完成状态 -->
+      <div v-if="allQuestionsCompleted && availableQuestions.length > 0" class="completion-state">
         <div class="completion-icon">🎉</div>
-        <h3>答题完成！</h3>
+        <h3>全部题目已完成！</h3>
         <p>恭喜您完成了所有题目</p>
         <router-link :to="`/listener/lecture/${lectureId}/score`" class="result-link">
           <span class="link-icon">📊</span>
@@ -92,61 +148,95 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
 
 const route = useRoute()
 const router = useRouter()
 const lectureId = route.params.id
-const questions = ref<any[]>([])
-const currentIndex = ref(0)
+
+// 数据结构定义
+interface QuizQuestion {
+  id: number
+  question: string
+  option_a: string
+  option_b: string
+  option_c: string
+  option_d: string
+  correct_option: string
+  group_id: number
+  published: boolean
+  created_at: string
+}
+
+interface QuizGroup {
+  groupId: number
+  questions: QuizQuestion[]
+}
+
+interface QuestionResult {
+  questionId: number
+  userAnswer: string
+  correctAnswer: string
+  isCorrect: boolean
+  answeredAt: Date
+}
+
+// 响应式数据
+const quizGroups = ref<QuizGroup[]>([])
+const availableQuestions = ref<QuizQuestion[]>([])
+const userAnswers = ref<Map<number, QuestionResult>>(new Map())
+const currentQuestionIndex = ref<number>(0)
 const userAnswer = ref('')
-const userAnswers = ref<string[]>([])
-const answered = ref(false)
-const isCorrect = ref(false)
+const showFeedback = ref(true)
 const loading = ref(true)
-const currentLecture = ref<any>(null) // 新增：存储当前讲座信息
-const currentQuestion = computed(() => questions.value[currentIndex.value])
-const isLast = computed(() => currentIndex.value === questions.value.length - 1)
+const currentLecture = ref<any>(null)
+
+// 轮询相关
+let pollInterval: NodeJS.Timeout | null = null
+const POLL_INTERVAL = 3000 // 3秒轮询一次
+
+// 计算属性
+const totalQuestions = computed(() => availableQuestions.value.length)
+const completedQuestions = computed(() => userAnswers.value.size)
+const allQuestionsCompleted = computed(() => 
+  availableQuestions.value.length > 0 && 
+  completedQuestions.value >= totalQuestions.value
+)
+
+const currentQuestion = computed(() => {
+  if (availableQuestions.value.length === 0) return null
+  if (currentQuestionIndex.value >= availableQuestions.value.length) return null
+  return availableQuestions.value[currentQuestionIndex.value]
+})
 
 // 获取当前讲座信息
 const getCurrentLecture = async () => {
-  const currentLectureId = localStorage.getItem('currentLectureId')
+  const currentLectureId = localStorage.getItem('currentLectureId') || sessionStorage.getItem('currentLectureId')
   if (!currentLectureId || currentLectureId !== lectureId) {
     return null
   }
   
   try {
-    const token = sessionStorage.getItem('token')
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
     if (!token) {
       console.error('未找到认证令牌')
       return null
     }
     
-    // 调用API获取讲座信息
-    const response = await fetch(`http://localhost:3001/api/lectures/${lectureId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+    const response = await axios.get(`/api/lectures/${lectureId}`, {
+      headers: { Authorization: `Bearer ${token}` }
     })
     
-    if (!response.ok) {
-      console.error('获取讲座信息失败:', response.status)
-      return null
-    }
-    
-    const result = await response.json()
-    const lectureData = result.lecture
-    
+    const lectureData = response.data.lecture
     return {
       id: lectureData.id,
       title: lectureData.title,
       description: lectureData.description,
       speaker: lectureData.name || '未知讲者',
       createdAt: new Date(lectureData.created_at),
-      status: lectureData.status, // 0: 未开始, 1: 进行中, 2: 已结束
+      status: lectureData.status,
       speakerId: lectureData.speaker_id
     }
   } catch (error) {
@@ -159,12 +249,11 @@ const getCurrentLecture = async () => {
 const checkLectureStatus = () => {
   if (!currentLecture.value) return { ended: false, upcoming: false, active: false }
   
-  // 基于数据库状态字段判断：0-未开始, 1-进行中, 2-已结束
   const status = currentLecture.value.status
   return {
-    ended: status === 2,     // 已结束
-    upcoming: status === 0,  // 未开始
-    active: status === 1     // 进行中
+    ended: status === 2,
+    upcoming: status === 0,
+    active: status === 1
   }
 }
 
@@ -173,57 +262,335 @@ const isLectureEnded = computed(() => lectureStatus.value.ended)
 const isLectureUpcoming = computed(() => lectureStatus.value.upcoming)
 const isLectureActive = computed(() => lectureStatus.value.active)
 
-// 模拟AI生成题目（实际应调用后端API，AI生成题目并返回）
-async function fetchQuestions() {
-  loading.value = true
+// 获取已发布的题目
+const fetchPublishedQuizzes = async () => {
+  try {
+    const token = sessionStorage.getItem('token')
+    if (!token) return
+    
+    const response = await axios.get(`/api/quiz/lecture/${lectureId}/published`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    if (response.data && response.data.success && response.data.data) {
+      const quizzes = response.data.data.quizzes || []
+      
+      // 过滤已发布的题目
+      const publishedQuizzes = quizzes.filter((quiz: QuizQuestion) => quiz.published)
+      
+      // 更新可用题目列表（如果有新题目则追加）
+      const existingIds = new Set(availableQuestions.value.map(q => q.id))
+      const newQuizzes = publishedQuizzes.filter((quiz: QuizQuestion) => !existingIds.has(quiz.id))
+      
+      if (newQuizzes.length > 0) {
+        availableQuestions.value = [...availableQuestions.value, ...newQuizzes]
+        updateQuizGroups()
+        
+        // 如果当前索引超出范围，重置为0
+        if (currentQuestionIndex.value >= availableQuestions.value.length) {
+          currentQuestionIndex.value = 0
+        }
+        
+        // 加载当前题目的答案
+        loadCurrentQuestionAnswer()
+      }
+    }
+  } catch (error) {
+    console.error('获取题目失败:', error)
+  }
+}
+
+// 更新题目分组（保留用于统计）
+const updateQuizGroups = () => {
+  const groupMap = new Map<number, QuizQuestion[]>()
   
-  // 首先获取讲座信息
-  currentLecture.value = await getCurrentLecture()
+  availableQuestions.value.forEach(question => {
+    // 确保group_id是数字类型
+    const groupId = parseInt(question.group_id?.toString() || '1')
+    if (!groupMap.has(groupId)) {
+      groupMap.set(groupId, [])
+    }
+    groupMap.get(groupId)!.push(question)
+  })
   
-  // 如果讲座已结束或未开始，不加载题目
-  if (isLectureEnded.value || isLectureUpcoming.value) {
-    loading.value = false
+  // 按组ID排序（数字排序），每组内按创建时间排序
+  quizGroups.value = Array.from(groupMap.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([groupId, questions]) => ({
+      groupId,
+      questions: questions.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    }))
+    
+  console.log('题目分组结果:', quizGroups.value.map(g => ({ 
+    groupId: g.groupId, 
+    count: g.questions.length 
+  })))
+}
+
+// 加载当前题目的答案
+const loadCurrentQuestionAnswer = () => {
+  if (!currentQuestion.value) {
+    userAnswer.value = ''
     return
   }
   
-  // 这里用静态数据，实际应调用API
-  await new Promise(r => setTimeout(r, 1000))
-  questions.value = [
-    {
-      text: 'Vue3的响应式原理基于什么？',
-      options: ['Proxy', 'Object.defineProperty', 'Class', 'Reflect'],
-      answer: 'Proxy'
-    },
-    {
-      text: 'JavaScript的基本数据类型不包括？',
-      options: ['String', 'Number', 'Class', 'Boolean'],
-      answer: 'Class'
-    }
-  ]
-  loading.value = false
+  const result = userAnswers.value.get(currentQuestion.value.id)
+  if (result) {
+    userAnswer.value = result.userAnswer
+  } else {
+    userAnswer.value = ''
+  }
 }
-onMounted(fetchQuestions)
 
-function nextQuestion() {
-  if (!userAnswer.value) return
-  userAnswers.value[currentIndex.value] = userAnswer.value
-  answered.value = true
-  isCorrect.value = userAnswer.value === currentQuestion.value.answer
-  setTimeout(() => {
-    if (currentIndex.value < questions.value.length - 1) {
-      currentIndex.value++
-      userAnswer.value = ''
-      answered.value = false
-      isCorrect.value = false
+// 获取当前题目索引
+const getCurrentQuestionIndex = () => currentQuestionIndex.value
+
+// 获取进度百分比
+const getProgressPercentage = () => {
+  if (totalQuestions.value === 0) return 0
+  return Math.round(((currentQuestionIndex.value + 1) / totalQuestions.value) * 100)
+}
+
+// 主要的数据获取函数
+const fetchQuestions = async () => {
+  loading.value = true
+  
+  try {
+    // 获取讲座信息
+    currentLecture.value = await getCurrentLecture()
+    
+    // 如果讲座已结束或未开始，不加载题目
+    if (isLectureEnded.value || isLectureUpcoming.value) {
+      loading.value = false
+      return
     }
-  }, 500)
+    
+    // 获取已发布的题目
+    await fetchPublishedQuizzes()
+    
+    // 加载用户的答题记录
+    await loadUserAnswers()
+    
+  } catch (error) {
+    console.error('加载题目失败:', error)
+  } finally {
+    loading.value = false
+  }
 }
-function submitPaper() {
+
+// 加载用户答题记录
+const loadUserAnswers = async () => {
+  try {
+    const token = sessionStorage.getItem('token')
+    if (!token) return
+    
+    console.log('加载用户答题记录，讲座ID:', lectureId)
+    
+    // 尝试多个API端点
+    let response: any = null
+    let answers: any[] = []
+    
+    try {
+      // 首先尝试 quiz 路由
+      response = await axios.get(`/api/quiz/lecture/${lectureId}/my-answers`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      console.log('Quiz API响应:', response?.data)
+    } catch (error1) {
+      console.log('Quiz API失败，尝试answers API:', error1.message)
+      try {
+        // 尝试 answers 路由
+        response = await axios.get(`/api/answers/lecture/${lectureId}/my-answers`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        console.log('Answers API响应:', response?.data)
+      } catch (error2) {
+        console.error('两个API都失败了:', error2.message)
+        return
+      }
+    }
+    
+    if (!response) return
+    
+    console.log('答题记录响应:', response.data)
+    
+    // 处理响应数据 - 支持多种格式
+    if (Array.isArray(response.data)) {
+      answers = response.data
+    } else if (response.data && response.data.success && response.data.data) {
+      answers = response.data.data.answers || response.data.data || []
+    } else if (response.data && Array.isArray(response.data.data)) {
+      answers = response.data.data
+    } else if (response.data && response.data.data) {
+      answers = [response.data.data]
+    }
+    
+    console.log('解析的答题记录:', answers)
+    console.log('答题记录数量:', answers.length)
+    
+    // 清空现有答题记录
+    userAnswers.value.clear()
+    
+    answers.forEach((answer: any, index: number) => {
+      console.log(`处理答题记录 ${index + 1}:`, answer)
+      
+      // 支持多种可能的字段名
+      const questionId = answer.quiz_id || answer.questionId || answer.id || answer.question_id
+      const userAnswerText = answer.selected_option || answer.user_answer || answer.answer || answer.userAnswer
+      const correctAnswerText = answer.correct_option || answer.correct_answer || answer.correctAnswer
+      const isCorrectFlag = answer.is_correct !== undefined ? answer.is_correct : (answer.isCorrect !== undefined ? answer.isCorrect : false)
+      const answeredTime = answer.answered_at || answer.submittedAt || answer.created_at || answer.createdAt
+      
+      if (questionId) {
+        const result = {
+          questionId: parseInt(questionId),
+          userAnswer: userAnswerText,
+          correctAnswer: correctAnswerText,
+          isCorrect: Boolean(isCorrectFlag),
+          answeredAt: new Date(answeredTime || Date.now())
+        }
+        
+        userAnswers.value.set(parseInt(questionId), result)
+        console.log(`已保存答题记录: 题目${questionId} -> 用户答案:${userAnswerText}, 正确:${isCorrectFlag}`)
+      } else {
+        console.warn('跳过无效的答题记录:', answer)
+      }
+    })
+    
+    console.log('用户答题记录加载完成，共', userAnswers.value.size, '条记录')
+    console.log('答题记录详情:', Array.from(userAnswers.value.entries()).map(([id, result]) => ({
+      questionId: id,
+      userAnswer: result.userAnswer,
+      isCorrect: result.isCorrect
+    })))
+    
+    // 重新加载当前题目的答案状态
+    loadCurrentQuestionAnswer()
+    
+  } catch (error) {
+    console.error('加载用户答题记录失败:', error)
+    if (error.response) {
+      console.error('错误响应:', error.response.data)
+    }
+  }
+}
+
+// 开始轮询
+const startPolling = () => {
+  if (pollInterval) return
+  
+  pollInterval = setInterval(async () => {
+    if (!isLectureEnded.value && !isLectureUpcoming.value) {
+      await fetchPublishedQuizzes()
+    }
+  }, POLL_INTERVAL)
+}
+
+// 停止轮询
+const stopPolling = () => {
+  if (pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
+}
+
+// 题目操作函数
+const goToPreviousQuestion = () => {
+  if (currentQuestionIndex.value > 0) {
+    currentQuestionIndex.value--
+    loadCurrentQuestionAnswer()
+  }
+}
+
+const goToNextQuestion = (currentQuestion?: QuizQuestion) => {
+  if (currentQuestionIndex.value < totalQuestions.value - 1) {
+    currentQuestionIndex.value++
+    loadCurrentQuestionAnswer()
+  }
+}
+
+const submitAnswer = async (question: QuizQuestion) => {
   if (!userAnswer.value) return
-  userAnswers.value[currentIndex.value] = userAnswer.value
-  // 这里可以跳转到成绩页或显示提交成功
-  questions.value.length = 0 // 静态实例：清空题目表示已提交
+  
+  try {
+    const token = sessionStorage.getItem('token')
+    if (!token) return
+    
+    console.log('提交答案:', {
+      questionId: question.id,
+      answer: userAnswer.value,
+      correctAnswer: question.correct_option
+    })
+    
+    const response = await axios.post(`/api/quiz/${question.id}/answer`, {
+      answer: userAnswer.value
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    console.log('答题提交响应:', response.data)
+    
+    if (response.data && (response.data.success || response.data.message)) {
+      // 保存答题结果
+      const result: QuestionResult = {
+        questionId: question.id,
+        userAnswer: userAnswer.value,
+        correctAnswer: question.correct_option,
+        isCorrect: userAnswer.value === question.correct_option,
+        answeredAt: new Date()
+      }
+      
+      userAnswers.value.set(question.id, result)
+      console.log('答题结果已保存:', result)
+      console.log('当前用户答题记录:', Array.from(userAnswers.value.entries()))
+      
+      // 显示反馈后自动跳转到下一题
+      setTimeout(() => {
+        if (currentQuestionIndex.value < totalQuestions.value - 1) {
+          goToNextQuestion()
+        }
+      }, 2000)
+    }
+  } catch (error) {
+    console.error('提交答案失败:', error)
+    if (error.response) {
+      console.error('错误响应:', error.response.data)
+    }
+  }
 }
+
+// 辅助函数
+const isQuestionCompleted = (questionId: number) => {
+  const completed = userAnswers.value.has(questionId)
+  console.log(`题目 ${questionId} 完成状态:`, completed)
+  return completed
+}
+
+const getQuestionOptions = (question: QuizQuestion) => [
+  question.option_a,
+  question.option_b,
+  question.option_c,
+  question.option_d
+].filter(Boolean)
+
+const getCorrectAnswer = (question: QuizQuestion) => question.correct_option
+
+const getQuestionResult = (questionId: number) => userAnswers.value.get(questionId)
+
+// 生命周期
+onMounted(() => {
+  fetchQuestions()
+  startPolling()
+})
+
+onUnmounted(() => {
+  stopPolling()
+})
+
+// 监听当前题目变化，自动加载答案
+watch(currentQuestion, () => {
+  loadCurrentQuestionAnswer()
+})
 </script>
 
 <style scoped>
@@ -279,30 +646,65 @@ function submitPaper() {
   opacity: 0.8;
 }
 
-.loading-container {
+/* 题目统计信息 */
+.quiz-stats {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(16, 163, 127, 0.1);
+}
+
+.stats-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 3rem;
+  gap: 0.3rem;
+}
+
+.stats-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.stats-value {
+  font-size: 1.2rem;
+  font-weight: 700;
   color: #10a37f;
 }
 
-.loading-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid rgba(16, 163, 127, 0.2);
-  border-top: 3px solid #10a37f;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
+/* 无题目状态 */
+.no-quiz-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.no-quiz-icon {
+  font-size: 4rem;
+  margin-bottom: 1.5rem;
+  opacity: 0.6;
 }
 
+.no-quiz-state h3 {
+  font-size: 1.5rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+
+.no-quiz-state p {
+  color: #9ca3af;
+  font-size: 1rem;
+}
+
+/* 单题目显示模式 */
 .quiz-content {
   display: flex;
   justify-content: center;
@@ -351,12 +753,40 @@ function submitPaper() {
   transition: width 0.3s ease;
 }
 
+.current-question {
+  animation: fadeIn 0.5s ease-out;
+}
+
 .question-text {
   font-size: 1.2rem;
   font-weight: 600;
   color: #047857;
   margin-bottom: 1.5rem;
   line-height: 1.5;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: #10a37f;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(16, 163, 127, 0.2);
+  border-top: 3px solid #10a37f;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .options-container {
@@ -456,6 +886,7 @@ function submitPaper() {
   display: flex;
   justify-content: center;
   gap: 1rem;
+  margin-top: 1.5rem;
 }
 
 .action-btn {
@@ -479,6 +910,12 @@ function submitPaper() {
   box-shadow: 0 4px 15px rgba(16, 163, 127, 0.3);
 }
 
+.action-btn.secondary {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border: 2px solid rgba(107, 114, 128, 0.3);
+}
+
 .action-btn.submit {
   background: linear-gradient(135deg, #059669 0%, #047857 100%);
   color: white;
@@ -488,6 +925,12 @@ function submitPaper() {
 .action-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(16, 163, 127, 0.4);
+}
+
+.action-btn.secondary:hover {
+  background: rgba(107, 114, 128, 0.2);
+  color: #4b5563;
+  transform: translateY(-2px);
 }
 
 .action-btn:disabled {

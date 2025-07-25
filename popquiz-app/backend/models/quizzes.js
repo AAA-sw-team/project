@@ -68,6 +68,33 @@ async function publishLectureQuizzes(lectureId, quizIds) {
   );
 }
 
+/** 获取某讲座的下一个组号（从1开始） */
+async function getNextGroupId(lectureId) {
+  const [rows] = await pool.promise().query(
+    'SELECT COALESCE(MAX(CAST(group_id AS UNSIGNED)), 0) + 1 as next_group_id FROM quizzes WHERE lecture_id = ? AND group_id REGEXP "^[0-9]+$"',
+    [lectureId]
+  );
+  return rows[0].next_group_id;
+}
+
+/** 获取某讲座所有的组号列表 */
+async function getGroupIds(lectureId) {
+  const [rows] = await pool.promise().query(
+    'SELECT DISTINCT group_id FROM quizzes WHERE lecture_id = ? ORDER BY CAST(group_id AS UNSIGNED)',
+    [lectureId]
+  );
+  return rows.map(row => row.group_id);
+}
+
+/** 获取某讲座的已发布题目 */
+async function getPublishedQuizzes(lectureId) {
+  const [rows] = await pool.promise().query(
+    'SELECT * FROM quizzes WHERE lecture_id = ? AND published = 1 ORDER BY CAST(group_id AS UNSIGNED), created_at',
+    [lectureId]
+  );
+  return rows;
+}
+
 module.exports = {
   createQuiz,
   deleteQuiz,
@@ -76,5 +103,8 @@ module.exports = {
   publishQuizzes,
   publishLectureQuizzes,
   deleteQuizzes,
-  getQuizzesByGroupId
+  getQuizzesByGroupId,
+  getNextGroupId,
+  getGroupIds,
+  getPublishedQuizzes
 };

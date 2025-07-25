@@ -1,4 +1,5 @@
 <template>
+
   <div class="feedback-wrapper">
     <div class="header-section">
       <div class="title-icon animate-bounce">📊</div>
@@ -88,11 +89,13 @@
           </div>
         </div>
       </div>
+
     </div>
   </div>
 </template>
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 
@@ -223,10 +226,12 @@ onMounted(() => {
 }
 .feedbacks-section {
   background: rgba(255, 255, 255, 0.7);
+
   border-radius: 12px;
   padding: 1.5rem;
   border: 1px solid rgba(16, 163, 127, 0.1);
 }
+
 .empty-state {
   text-align: center;
   padding: 3rem 1.5rem;
@@ -292,14 +297,61 @@ onMounted(() => {
   padding-left: 18px;
   margin: 0;
 }
-.feedback-item {
-  font-size: 1.05rem;
-  color: #2d8c7f;
-  margin-bottom: 4px;
+
+.feedback-details {
+  margin-top: 0.5rem;
 }
-.feedback-other {
-  color: #e53935;
+
+.feedback-type, .feedback-message {
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
 }
+
+.type-label, .message-label {
+  font-weight: 600;
+  color: #047857;
+  margin-right: 0.5rem;
+}
+
+.type-value, .message-value {
+  color: #374151;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.page-btn {
+  padding: 0.5rem 1rem;
+  background: #2d8c7f;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: #047857;
+}
+
+.page-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.page-info {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
 .feedback-type {
   background: #e0f2fe;
   color: #059669;

@@ -84,6 +84,7 @@
           <div class="empty-icon">💬</div>
           <h4>暂无评论</h4>
           <p>成为第一个发表观点的人吧！</p>
+
         </div>
         <div class="discussion-input-box">
           <input v-model="newComment" placeholder="输入评论..." />
@@ -95,11 +96,13 @@
         <button @click="prevQuestion" :disabled="currentIndex === 0" class="discussion-btn">上一题</button>
         <button @click="nextQuestion" :disabled="currentIndex === questions.length - 1" class="discussion-btn">下一题</button>
       </div>
+
       -->
     </div>
   </div>
 </template>
 <script setup lang="ts">
+
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
@@ -219,6 +222,7 @@ async function sendReply(comment: any) {
 function replyTo(comment: any) {
   replyingTo.value = comment.id
   replyContent.value = ''
+
 }
 // 注释掉题目切换相关
 // function nextQuestion() {
@@ -233,6 +237,7 @@ function replyTo(comment: any) {
 // }
 </script>
 <style scoped>
+
 .discussion-wrapper {
   max-width: 800px;
   margin: 0 auto;
@@ -317,29 +322,41 @@ function replyTo(comment: any) {
   margin: 0;
   font-size: 0.9rem;
 }
-.discussion-question {
-  width: 100%;
-  margin-bottom: 18px;
-}
-.discussion-qtext {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: #333;
-}
-.discussion-options {
+
+.error-banner {
   display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 8px;
-}
-.discussion-option {
-  background: #e0f7fa;
-  color: #26c6da;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border: 1px solid #fca5a5;
   border-radius: 8px;
-  padding: 4px 12px;
-  font-size: 1rem;
+  color: #dc2626;
+  font-size: 0.9rem;
+  position: relative;
 }
+
+.error-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.error-close {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #dc2626;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
 .comments-section {
   background: rgba(255, 255, 255, 0.7);
   border-radius: 12px;
@@ -422,6 +439,7 @@ function replyTo(comment: any) {
 .comment-body {
   color: #374151;
   line-height: 1.6;
+
   font-size: 0.95rem;
   margin-bottom: 0.8rem;
 }
@@ -447,6 +465,7 @@ function replyTo(comment: any) {
   color: #059669;
   box-shadow: 0 2px 8px rgba(16,163,127,0.13);
 }
+
 .discussion-reply-box {
   margin-top: 8px;
   display: flex;
@@ -490,11 +509,17 @@ function replyTo(comment: any) {
   font-size: 0.95rem;
   line-height: 1.5;
 }
+
 .discussion-input-box {
   display: flex;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  background: #f0fdfa;
+  border-radius: 12px;
+  border: 2px solid #a7f3d0;
 }
+
 .discussion-input-box input {
   flex: 1;
   padding: 7px 10px;
@@ -528,22 +553,31 @@ function replyTo(comment: any) {
   gap: 18px;
   margin-top: 12px;
 }
-.discussion-btn {
-  background: #26c6da;
-  color: #fff;
+
+.send-btn {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
   border: none;
   border-radius: 8px;
-  padding: 8px 28px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.18s, box-shadow 0.18s;
-  box-shadow: 0 1px 4px rgba(44,209,171,0.07);
+  transition: all 0.2s ease;
+  min-width: 80px;
 }
-.discussion-btn:disabled {
-  background: #b2dfdb;
-  color: #fff;
+
+.send-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+
+.send-btn:disabled {
+  background: #9ca3af;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 .comment-ops.comment-actions {
   display: flex;
