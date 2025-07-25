@@ -28,7 +28,7 @@ const getQuizStatistics = async (req, res) => {
   const lectureId = req.params.lectureId;
 
   try {
-    const [quizzes] = await quizModel.getQuizzesByLectureId(lectureId);
+    const quizzes = await quizModel.getQuizzes(lectureId);
 
     const results = [];
     for (const quiz of quizzes) {
