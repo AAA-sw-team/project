@@ -119,18 +119,25 @@ class DiscussionModel {
                         SELECT 
                             d.id,
                             d.message,
+                            d.message_type,
+                            d.parent_id,
+                            d.is_pinned,
+                            d.is_anonymous,
                             d.created_at,
+                            d.updated_at,
                             CASE WHEN d.is_anonymous = TRUE THEN '匿名用户' ELSE u.username END as username,
                             CASE WHEN d.is_anonymous = TRUE THEN 'anonymous' ELSE u.role END as user_role,
-                            u.id as user_id
+                            u.id as user_id,
+                            (SELECT COUNT(*) FROM discussion_likes dl WHERE dl.discussion_id = d.id) as like_count,
+                            (SELECT COUNT(*) FROM lecture_discussions replies WHERE replies.parent_id = d.id) as reply_count
                         FROM lecture_discussions d
                         LEFT JOIN users u ON d.user_id = u.id
-                        WHERE d.parent_id = ?
+                        WHERE d.parent_id = ? AND d.lecture_id = ?
                         ORDER BY d.created_at ASC
                         LIMIT 10
                     `;
-                    const [replies] = await dbExecute(repliesQuery, [message.id]);
-                    message.replies = replies;
+                    const [replies] = await dbExecute(repliesQuery, [message.id, lectureId]);
+                    message.replies = Array.isArray(replies) ? replies : (replies ? [replies] : []);
                 } else {
                     message.replies = [];
                 }
@@ -181,11 +188,15 @@ class DiscussionModel {
     // 置顶/取消置顶消息（仅讲师）
     static async togglePin(discussionId, lectureId, userId) {
         try {
-            // 检查讲师权限
+            // 检查讲师或组织者权限
             const ParticipantModel = require('./participantModel');
             const isCreator = await ParticipantModel.isLectureCreator(lectureId, userId);
-            if (!isCreator) {
-                return { success: false, message: '只有讲座创建者可以置顶消息' };
+            const db = require('./db');
+            // 查询用户角色
+            const [userRows] = await db.promise().query('SELECT role FROM users WHERE id = ?', [userId]);
+            const userRole = userRows && userRows[0] ? userRows[0].role : null;
+            if (!isCreator && userRole !== 'organizer') {
+                return { success: false, message: '只有讲座创建者或组织者可以置顶消息' };
             }
             // 获取当前置顶状态
             const checkQuery = `SELECT is_pinned FROM lecture_discussions WHERE id = ? AND lecture_id = ?`;
@@ -207,7 +218,7 @@ class DiscussionModel {
         }
     }
 
-    // 删除消息（用户删除自己的消息或讲师删除任意消息）
+    // 删除消息（用户删除自己的消息或讲师/组织者删除任意消息）
     static async deleteMessage(discussionId, lectureId, userId, userRole) {
         try {
             // 获取消息信息
@@ -217,10 +228,10 @@ class DiscussionModel {
                 return { success: false, message: '消息不存在' };
             }
             const messageUserId = messageResult[0].user_id;
-            // 检查权限：消息作者或讲师可以删除
+            // 检查权限：消息作者、讲师或组织者可以删除
             const ParticipantModel = require('./participantModel');
             const isCreator = await ParticipantModel.isLectureCreator(lectureId, userId);
-            if (messageUserId !== userId && !isCreator) {
+            if (messageUserId !== userId && !isCreator && userRole !== 'organizer') {
                 return { success: false, message: '没有权限删除此消息' };
             }
             // 删除消息（级联删除回复和点赞）

@@ -8,6 +8,7 @@ class DiscussionController {
             const { lectureId } = req.params;
             const { message, messageType = 'text', parentId = null, isAnonymous = false } = req.body;
             const userId = req.user.userId;
+            const userRole = req.user.role;
 
             // 验证消息内容
             if (!message || message.trim().length === 0) {
@@ -33,19 +34,21 @@ class DiscussionController {
                 });
             }
 
-            // 检查发言权限
-            const canSend = await DiscussionModel.canSendMessage(lectureId, userId);
-            if (!canSend.canSend) {
-                return res.status(403).json({
-                    success: false,
-                    message: canSend.reason
-                });
+            // 组织者可直接发言，其它用户需原有权限
+            if (userRole !== 'organizer') {
+                const canSend = await DiscussionModel.canSendMessage(lectureId, userId);
+                if (!canSend.canSend) {
+                    return res.status(403).json({
+                        success: false,
+                        message: canSend.reason
+                    });
+                }
             }
 
             // 如果是回复消息，验证父消息是否存在
             if (parentId) {
                 const db = require('../models/db');
-                const [parentMsg] = await db.execute(
+                const [parentMsg] = await db.promise().query(
                     'SELECT id FROM lecture_discussions WHERE id = ? AND lecture_id = ?',
                     [parentId, lectureId]
                 );
@@ -141,10 +144,15 @@ class DiscussionController {
             const { lectureId } = req.params;
             const { page = 1, limit = 30 } = req.query;
             const userId = req.user.userId;
+            const userRole = req.user.role;
 
-            // 检查访问权限
+            // 组织者可直接访问，其它用户需原有权限
             const canAccess = await DiscussionModel.canSendMessage(lectureId, userId);
-            if (!canAccess.canSend && !await ParticipantModel.isLectureCreator(lectureId, userId)) {
+            if (
+                userRole !== 'organizer' &&
+                !canAccess.canSend &&
+                !await ParticipantModel.isLectureCreator(lectureId, userId)
+            ) {
                 return res.status(403).json({
                     success: false,
                     message: '没有权限查看讨论'
@@ -164,10 +172,10 @@ class DiscussionController {
             result.messages = result.messages.map(message => ({
                 ...message,
                 isLikedByUser: userLikes.includes(message.id),
-                replies: message.replies.map(reply => ({
+                replies: Array.isArray(message.replies) ? message.replies.map(reply => ({
                     ...reply,
                     isLikedByUser: userLikes.includes(reply.id)
-                }))
+                })) : []
             }));
 
             res.json({
