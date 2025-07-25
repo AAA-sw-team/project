@@ -4,20 +4,22 @@
 const axios = require('axios');
 require('dotenv').config();
 
-const API_URL = 'http://localhost:11434/api/generate';
-//const API_KEY = process.env.DEEPSEEK_API_KEY;
+const API_URL = 'https://api.deepseek.com/v1/chat/completions';
+const API_KEY = process.env.DEEPSEEK_API_KEY;
 
 async function generateQuizFromText(inputText, retryCount = 0) {
   const maxRetries = 3; // 最大重试次数
   
   const prompt = `
-你是一个专业的 AI 出题助手以及一名优秀的命题老师，现在想要检查学生的听课情况，接下来我会给你一段讲座内容，请基于这段内容生成 5 道单项选择题（带四个选项和标准答案），我i希望你能够给出一些值得思考和深思的题目，具有一定意义，可以引用实事新闻传记书藉等中的语句作为材料，题干尽量能给的长一些。
+请直接输出JSON数组，不要包含任何思考过程、解释、推理或其他文本。
+
+你是一个专业的 AI 出题助手以及一名优秀的命题老师，现在想要检查学生的听课情况，请阅读以下文本内容，并基于其核心观点或隐含含义，生成 5 道单项选择题（带四个选项和标准答案），我希望你能够给出一些值得思考和深思的题目，具有一定意义，可以引用实事新闻传记书藉等中的语句作为材料，题干尽量能给的长一些。
 
 重要要求：
-1. 每题必须包含一个问题和4个完整的选项（A、B、C、D），只有一个正确答案。
-2. 每个选项都必须有实际内容，不能为空。
+1. 不用进行分析，输出的直接为题目，每题必须包含一个问题和4个完整的选项（A、B、C、D），只有一个正确答案。
+2. 每个选项都必须有实际内容，字数不能为空，至少有两个题题目问题部分不少于60字。
 3. 正确答案必须严格是 A、B、C、D 中的一个字母，绝对不能使用 E、F 或其他字母。
-4. 问题应覆盖不同的知识点，避免重复。
+4. 问题应覆盖不同的知识点，问题形式避免重复,问题内容应基于文本，但不局限于表层内容，可适度延伸，具有思辨性或延伸性，能够引发读者深入思考
 5. 使用中文出题，内容清晰严谨，贴近讲座重点。
 6. 返回格式必须是标准JSON数组，只输出JSON，不要输出任何解释或标签。
 7. 请严格按照以下格式，确保每个字段都有有效内容：
@@ -55,29 +57,49 @@ ${inputText}
     console.log(`正在生成题目... (尝试 ${retryCount + 1}/${maxRetries + 1})`);
     
     const response = await axios.post(API_URL, {
-      model: 'deepseek-r1:1.5b',
-      prompt: prompt,
+      model: 'deepseek-chat',
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
       stream: false,
-      options: {
-        temperature: 0.6 + (retryCount * 0.1), // 每次重试稍微调整温度
-        stop: [
-          "<｜begin▁of▁sentence｜>",
-          "<｜end▁of▁sentence｜>",
-          "<｜User｜>",
-          "<｜Assistant｜>"
-        ]
+      temperature: 0.6 + (retryCount * 0.1), // 每次重试稍微调整温度
+      max_tokens: 4000
+    }, {
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json'
       }
     });
 
-    const result = response.data.response;
+    const result = response.data.choices[0].message.content;
     console.log('AI 原始返回内容:', result);
     
+    // 处理 DeepSeek R1 模型的 <think> 标签，提取实际响应内容
+    let cleanedResult = result;
+    
+    // 如果包含 <think> 标签，提取 </think> 后的内容
+    const thinkTagEnd = result.indexOf('</think>');
+    if (thinkTagEnd !== -1) {
+      cleanedResult = result.substring(thinkTagEnd + 8).trim(); // 8 是 '</think>' 的长度
+      console.log('移除 <think> 标签后的内容:', cleanedResult);
+    }
+    
     // 提取第一个 [ 到最后一个 ] 之间的内容，防止带标签或多余内容
-    const jsonMatch = result.match(/\[.*\]/s);
-    if (!jsonMatch) throw new Error('AI 返回内容中未找到 JSON 数组');
+    const jsonMatch = cleanedResult.match(/\[.*\]/s);
+    if (!jsonMatch) {
+      console.log('在清理后的内容中未找到 JSON 数组，尝试从原始内容中提取...');
+      const fallbackMatch = result.match(/\[.*\]/s);
+      if (!fallbackMatch) throw new Error('AI 返回内容中未找到 JSON 数组');
+      var matchedContent = fallbackMatch[0];
+    } else {
+      var matchedContent = jsonMatch[0];
+    }
     
     // 清理控制字符，但保留必要的空格和换行
-    let cleanJson = jsonMatch[0]
+    let cleanJson = matchedContent
       .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // 移除控制字符，但保留 \t \n \r
       .replace(/\t/g, ' ') // 将制表符替换为空格
       .replace(/\r\n/g, '\n') // 统一换行符

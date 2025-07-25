@@ -28,6 +28,11 @@
                 </div>
                 <div class="lecture-details">
                   <div class="lecture-item">
+                    <span class="item-icon">🆔</span>
+                    <span class="item-label">ID：</span>
+                    <span class="item-value">{{ getCurrentLecture().id || '无' }}</span>
+                  </div>
+                  <div class="lecture-item">
                     <span class="item-icon">👤</span>
                     <span class="item-label">讲师：</span>
                     <span class="item-value">{{ getCurrentLecture().speaker || '无' }}</span>
@@ -525,6 +530,8 @@ const loadCurrentLecture = async () => {
       currentLectureData.value = null
     }
   } else {
+
+    
     currentLectureData.value = null
   }
 }

@@ -530,6 +530,18 @@ const fetchScoreData = async () => {
     } else {
       error.value = err.message || '获取数据失败，请稍后重试'
     }
+    console.log('=== ScorePage 数据调试 ===')
+    console.log('lectureStats:', lectureStats.value)
+    console.log('myStats:', myStats.value)
+    console.log('myAnswers:', myAnswers.value)
+    console.log('计算结果:')
+    console.log('- overallAccuracy:', overallAccuracy.value)
+    console.log('- completionRate:', completionRate.value)
+    console.log('- totalCorrect:', totalCorrect.value)
+    console.log('- totalAnswers:', totalAnswers.value)
+    console.log('- answeredQuestions:', answeredQuestions.value)
+    console.log('- totalQuestions:', totalQuestions.value)
+
   } finally {
     loading.value = false
     console.log('=== fetchScoreData 完成 ===')

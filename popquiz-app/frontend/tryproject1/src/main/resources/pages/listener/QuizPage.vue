@@ -531,12 +531,15 @@ const submitAnswer = async (question: QuizQuestion) => {
     console.log('答题提交响应:', response.data)
     
     if (response.data && (response.data.success || response.data.message)) {
+      // 根据后端返回的结果来确定正确性
+      const isCorrect = response.data.isCorrect !== undefined ? response.data.isCorrect : false
+      
       // 保存答题结果
       const result: QuestionResult = {
         questionId: question.id,
         userAnswer: userAnswer.value,
         correctAnswer: question.correct_option,
-        isCorrect: userAnswer.value === question.correct_option,
+        isCorrect: isCorrect,
         answeredAt: new Date()
       }
       
@@ -573,7 +576,16 @@ const getQuestionOptions = (question: QuizQuestion) => [
   question.option_d
 ].filter(Boolean)
 
-const getCorrectAnswer = (question: QuizQuestion) => question.correct_option
+const getCorrectAnswer = (question: QuizQuestion) => {
+  const correctLetter = question.correct_option.toUpperCase()
+  const options = {
+    'A': question.option_a,
+    'B': question.option_b,
+    'C': question.option_c,
+    'D': question.option_d
+  }
+  return `${correctLetter}. ${options[correctLetter] || question.correct_option}`
+}
 
 const getQuestionResult = (questionId: number) => userAnswers.value.get(questionId)
 
