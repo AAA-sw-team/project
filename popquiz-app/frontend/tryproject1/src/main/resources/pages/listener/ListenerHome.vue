@@ -649,7 +649,7 @@ onMounted(() => {
 .lectures-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 2.5rem;
+  gap: 2rem;
   width: 100%;
   padding: 0 1rem;
 }
@@ -658,8 +658,8 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 20px;
-  padding: 1rem;
+  border-radius: 16px;
+  padding: 0.8rem;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
@@ -687,14 +687,14 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.8rem;
 }
 
 .status-badge {
   color: white;
-  padding: 0.3rem 0.8rem;
-  border-radius: 12px;
-  font-size: 0.7rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 10px;
+  font-size: 0.65rem;
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
@@ -723,18 +723,18 @@ onMounted(() => {
 }
 
 .lecture-id {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: #047857;
   font-weight: 600;
 }
 
 .reenter-icon {
-  font-size: 1.2rem;
+  font-size: 1rem;
   color: #10a37f;
   background: rgba(16, 163, 127, 0.1);
   border-radius: 50%;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -764,25 +764,25 @@ onMounted(() => {
   text-decoration: none;
   color: inherit;
   display: block;
-  margin-bottom: 1rem;
+  margin-bottom: 0.8rem;
 }
 
 .lecture-title {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 700;
   background: linear-gradient(135deg, #10a37f 0%, #059669 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 0.8rem;
+  margin-bottom: 0.6rem;
   line-height: 1.3;
 }
 
 .lecture-desc {
   color: #64748b;
-  font-size: 0.9rem;
-  line-height: 1.6;
-  margin-bottom: 1.2rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin-bottom: 1rem;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -793,33 +793,33 @@ onMounted(() => {
 .lecture-meta {
   display: flex;
   align-items: center;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: #94a3b8;
 }
 
 .lecture-speaker {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   background: rgba(16, 163, 127, 0.1);
-  padding: 0.3rem 0.8rem;
-  border-radius: 12px;
+  padding: 0.25rem 0.6rem;
+  border-radius: 10px;
   color: #10a37f;
   font-weight: 500;
 }
 
 .icon {
-  font-size: 1rem;
+  font-size: 0.9rem;
 }
 
 .card-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 1.2rem;
+  padding-top: 1rem;
   border-top: 1px solid rgba(148, 163, 184, 0.2);
   color: #10a37f;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
 }
 

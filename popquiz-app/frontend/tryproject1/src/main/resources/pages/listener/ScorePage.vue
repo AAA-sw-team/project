@@ -129,11 +129,11 @@
               <span class="detail-desc">{{ totalCorrect }}/{{ totalAnswers }} 题正确</span>
             </div>
           </div>
-          <div v-if="myStats.total_questions > 0" class="detail-item">
+          <div v-if="(myStats.total_questions && Number(myStats.total_questions) > 0) || (Array.isArray(myAnswers) && myAnswers.length > 0)" class="detail-item">
             <div class="detail-label">参与题数</div>
             <div class="detail-value">
-              <span class="accuracy-rate">{{ myStats.total_questions }}</span>
-              <span class="detail-desc">共 {{ lectureStats.questions_count || 0 }} 题</span>
+              <span class="accuracy-rate">{{ Number(myStats.total_questions) > 0 ? myStats.total_questions : (Array.isArray(myAnswers) ? myAnswers.length : 0) }}</span>
+              <span class="detail-desc">共 {{ lectureStats.questions_count }} 题</span>
             </div>
           </div>
           
@@ -175,7 +175,7 @@
             <div class="detail-label">完成情况</div>
             <div class="detail-value">
               <span class="completion-rate">{{ completionRate }}%</span>
-              <span class="detail-desc">{{ answeredQuestions }}/{{ totalQuestions }} 题作答</span>
+              <span class="detail-desc">{{ Number(myStats.total_questions) > 0 ? myStats.total_questions : (Array.isArray(myAnswers) ? myAnswers.length : 0) }}/{{ totalQuestions }} 题作答</span>
             </div>
           </div>
           <!-- 注释掉平均答题时间计算
@@ -235,68 +235,77 @@ const showCompletionDetails = ref(false)
 
 // 计算属性
 const overallAccuracy = computed(() => {
-  // 使用个人统计数据而不是答题记录
-  if (myStats.value && myStats.value.total_questions > 0) {
-    return Math.round(myStats.value.accuracy_rate || 0)
+  // 优先用myStats
+  if (myStats.value && Number(myStats.value.total_questions) > 0) {
+    // myStats.accuracy_rate通常为百分比（如87.5），如为小数需*100
+    let acc = myStats.value.accuracy_rate
+    if (acc > 1 && acc <= 100) return Math.round(acc)
+    if (acc > 0 && acc <= 1) return Math.round(acc * 100)
+    return 0
   }
-  // 如果没有统计数据，从答题记录计算
-  if (myAnswers.value.length === 0) return 0
+  // 兜底用myAnswers
+  if (!Array.isArray(myAnswers.value) || myAnswers.value.length === 0) return 0
   const correct = myAnswers.value.filter(answer => answer.is_correct).length
   return Math.round((correct / myAnswers.value.length) * 100)
 })
 
 const completionRate = computed(() => {
-  const totalQuestionsCount = lectureStats.value.questions_count || 0
+  const totalQuestionsCount = Number(lectureStats.value.questions_count) || 0
   if (totalQuestionsCount === 0) return 0
-  
-  // 使用个人统计数据
-  if (myStats.value && myStats.value.total_questions > 0) {
+  // 优先用myStats
+  if (myStats.value && Number(myStats.value.total_questions) > 0) {
     return Math.round((myStats.value.total_questions / totalQuestionsCount) * 100)
   }
-  
-  // 备用计算方式
-  const answeredQuestionsCount = myAnswers.value.length
+  // 兜底用myAnswers
+  const answeredQuestionsCount = Array.isArray(myAnswers.value) ? myAnswers.value.length : 0
   return Math.round((answeredQuestionsCount / totalQuestionsCount) * 100)
 })
 
 const totalCorrect = computed(() => {
-  if (myStats.value && myStats.value.correct_answers !== undefined) {
-    return myStats.value.correct_answers
+  if (myStats.value && typeof myStats.value.correct_answers !== 'undefined') {
+    return Number(myStats.value.correct_answers) || 0
   }
+  if (!Array.isArray(myAnswers.value)) return 0
   return myAnswers.value.filter(answer => answer.is_correct).length
 })
 
 const totalAnswers = computed(() => {
-  if (myStats.value && myStats.value.total_questions !== undefined) {
-    return myStats.value.total_questions
+  if (myStats.value && typeof myStats.value.total_questions !== 'undefined') {
+    return Number(myStats.value.total_questions) || 0
   }
+  if (!Array.isArray(myAnswers.value)) return 0
   return myAnswers.value.length
 })
 
 const answeredQuestions = computed(() => {
-  if (myStats.value && myStats.value.total_questions !== undefined) {
-    return myStats.value.total_questions
+  if (myStats.value && typeof myStats.value.total_questions !== 'undefined') {
+    return Number(myStats.value.total_questions) || 0
   }
+  if (!Array.isArray(myAnswers.value)) return 0
   return myAnswers.value.length
 })
 
 const totalQuestions = computed(() => {
-  return lectureStats.value.questions_count || 0
+  // 只取 lectureStats.value.questions_count
+  const count = Number(lectureStats.value?.questions_count)
+  if (isNaN(count) || count <= 0) {
+    console.log('[ScorePage] totalQuestions 计算异常，lectureStats.value:', lectureStats.value)
+  }
+  return count > 0 ? count : 0
 })
 
 // 获取我在排行榜中的排名
 const myRank = computed(() => {
-  if (!currentUserId.value || !leaderboard.value.length) {
+  if (!currentUserId.value || !Array.isArray(leaderboard.value) || leaderboard.value.length === 0) {
     return null
   }
-  
+  // 统一字符串比较
+  const myIdStr = String(currentUserId.value)
   const index = leaderboard.value.findIndex(user => {
     const userId = user.user_id || user.userId || user.id
-    return parseInt(userId) === parseInt(String(currentUserId.value || '0'))
+    return String(userId) === myIdStr
   })
-  
-  const rank = index >= 0 ? index + 1 : null
-  return rank
+  return index >= 0 ? index + 1 : null
 })
 
 // 获取我的排行榜信息 
@@ -304,9 +313,8 @@ const myRankInfo = computed(() => {
   if (!currentUserId.value) {
     return null
   }
-  
-  // 优先使用个人统计数据
-  if (myStats.value && Object.keys(myStats.value).length > 0) {
+  // 优先用myStats
+  if (myStats.value && Object.keys(myStats.value).length > 0 && Number(myStats.value.total_questions) > 0) {
     return {
       user_id: currentUserId.value,
       accuracy_rate: myStats.value.accuracy_rate || 0,
@@ -314,16 +322,15 @@ const myRankInfo = computed(() => {
       correct_answers: myStats.value.correct_answers || 0
     }
   }
-  
-  // 备用：从排行榜中查找
-  if (leaderboard.value.length > 0) {
+  // 兜底：排行榜查找
+  if (Array.isArray(leaderboard.value) && leaderboard.value.length > 0) {
+    const myIdStr = String(currentUserId.value)
     const userInLeaderboard = leaderboard.value.find(user => {
       const userId = user.user_id || user.userId || user.id
-      return parseInt(userId) === parseInt(String(currentUserId.value || '0'))
+      return String(userId) === myIdStr
     })
     return userInLeaderboard || null
   }
-  
   return null
 })
 
@@ -478,6 +485,7 @@ const fetchScoreData = async () => {
         if (statsData.success) {
           lectureStats.value = statsData.data.lectureStats
           groupStats.value = statsData.data.groupStats || []
+          console.log('[ScorePage] 赋值后 lectureStats.value:', lectureStats.value)
         }
       } catch (parseError) {
         console.error('Stats数据解析失败:', parseError)

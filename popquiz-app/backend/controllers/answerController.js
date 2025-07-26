@@ -128,17 +128,17 @@ const getUserAnswers = async (req, res) => {
   try {
     const answers = await answerModel.getUserAnswersByLecture(lectureId, userId);
     console.log('getUserAnswers - 查询结果:', answers?.length, '条记录');
-    
-    // 计算统计信息
-    const stats = {
+    // 统计信息兼容 user_quiz_stats 视图
+    const statsRow = await answerModel.getUserQuizStats(lectureId, userId);
+    // 兜底：如果 user_quiz_stats 没有数据，则用 answers 计算
+    const stats = statsRow && statsRow.total_questions > 0 ? statsRow : {
       total_questions: answers.length,
-      correct_answers: answers.filter(answer => answer.is_correct).length,
-      accuracy_rate: answers.length > 0 ? Math.round((answers.filter(answer => answer.is_correct).length / answers.length) * 100) : 0
+      correct_answers: answers.filter(a => a.is_correct).length,
+      accuracy_rate: answers.length > 0 ? Math.round((answers.filter(a => a.is_correct).length / answers.length) * 100) : 0,
+      groups_participated: 0,
+      avg_answer_time_ms: null
     };
-    
-    console.log('getUserAnswers - 计算的统计:', stats);
-    
-    res.json({ 
+    res.json({
       success: true,
       data: {
         answers: answers,
@@ -172,9 +172,20 @@ const getAnswerLeaderboard = async (req, res) => {
 
   try {
     const leaderboard = await answerModel.getAnswerLeaderboard(lectureId, limit);
+    // 确保每个对象都包含 user_id、accuracy_rate、total_questions 字段
+    const strictLeaderboard = leaderboard.map(item => ({
+      user_id: item.user_id,
+      accuracy_rate: item.accuracy_rate ?? 0,
+      total_questions: item.total_questions ?? 0,
+      // 其他字段可以根据需要保留或删除
+      username: item.username,
+      nickname: item.nickname,
+      correct_answers: item.correct_answers ?? 0,
+      avg_answer_time_ms: item.avg_answer_time_ms ?? null
+    }));
     res.json({
       success: true,
-      data: leaderboard
+      data: strictLeaderboard
     });
   } catch (err) {
     console.error('Error getting leaderboard:', err);

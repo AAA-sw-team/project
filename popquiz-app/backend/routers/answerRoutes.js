@@ -7,6 +7,7 @@ const {
   getUserAnswersByLectureAndUser,
   getAnswerLeaderboard
 } = require('../controllers/answerController');
+const { getLectureStats } = require('../controllers/lectureStatsController');
 const authMiddleware = require('../middleware/authMiddleware');
 
 // 提交答案 - 支持两种路由格式
@@ -16,8 +17,11 @@ router.post('/:quizId/answer', authMiddleware, submitAnswer);
 // 获取用户自己的答题记录
 router.get('/lecture/:lectureId/my-answers', authMiddleware, getUserAnswers);
 
-// 获取题目统计（讲师用）
-router.get('/lecture/:lectureId/stats', authMiddleware, getQuizStatistics);
+
+// 新增：获取讲座整体统计和分组统计，适配前端 strict 结构
+router.get('/lecture/:lectureId/stats', authMiddleware, getLectureStats);
+// 兼容老接口
+router.get('/lecture/:lectureId/quiz-stats', authMiddleware, getQuizStatistics);
 
 // 获取答题排行榜
 router.get('/lecture/:lectureId/leaderboard', authMiddleware, getAnswerLeaderboard);

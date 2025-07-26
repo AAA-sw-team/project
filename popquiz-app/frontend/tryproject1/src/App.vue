@@ -346,6 +346,15 @@ const handleLeaveLecture = async () => {
       // 调用退出讲座API
       await exitCurrentLecture()
       
+      // 清除当前讲座信息，隐藏当前讲座按钮
+      currentLectureData.value = null
+      localStorage.removeItem('currentLectureId')
+      sessionStorage.removeItem('currentLectureId')
+      
+      // 停止相关定时器
+      stopParticipantCountRefresh()
+      stopHeartbeat()
+      
       // 标记这是通过离开讲座按钮的合法导航
       sessionStorage.setItem('homeButtonClicked', 'true')
       
@@ -699,24 +708,13 @@ const exitCurrentLecture = async () => {
     const result = await response.json()
     console.log(`用户 ${userId} (${userName}) 已退出讲座 ${currentLecture.id}`)
     
-    // 听众退出讲座时不清除本地信息，以便重新进入未结束的讲座
-    // 只有当讲座已结束时才清除信息
-    if (userRole === 'speaker' || isLectureEnded(currentLecture)) {
-      localStorage.removeItem('currentLectureId')
-      localStorage.removeItem('currentLecture')
-      sessionStorage.removeItem('currentLectureId')
-      sessionStorage.removeItem('currentLecture')
-    }
+    // 退出讲座成功，清除本地信息（注意：此函数不负责清除currentLectureData，由调用者处理）
     
     // 根据用户角色显示不同的提示
     const roleText = userRole === 'speaker' ? '讲师' : '听众'
-    const message = userRole === 'listener' && !isLectureEnded(currentLecture) 
-      ? `${roleText}已退出讲座"${currentLecture.title}"，您可以随时重新进入未结束的讲座`
-      : `${roleText}已成功退出讲座"${currentLecture.title}"`
+    const message = `${roleText}已成功退出讲座"${currentLecture.title}"`
     
-    setTimeout(() => {
-      alert(message)
-    }, 100)
+    console.log(message) // 用于调试，实际提示由调用者处理
     
   } catch (error) {
     console.error('退出讲座时发生错误:', error)
@@ -738,13 +736,7 @@ const exitCurrentLecture = async () => {
     const continueAnyway = confirm(`${errorMessage}\n\n是否要继续退出讲座？（将清除本地状态）`)
     
     if (continueAnyway) {
-      // 用户选择继续，清除本地状态
-      if (userRole === 'speaker' || isLectureEnded(currentLecture)) {
-        localStorage.removeItem('currentLectureId')
-        localStorage.removeItem('currentLecture')
-        sessionStorage.removeItem('currentLectureId')
-        sessionStorage.removeItem('currentLecture')
-      }
+      // 用户选择继续，清除本地状态（注意：此函数不负责清除currentLectureData，由调用者处理）
       
       const roleText = userRole === 'speaker' ? '讲师' : '听众'
       alert(`${roleText}已在本地退出讲座，但服务器状态可能未同步`)

@@ -194,7 +194,7 @@ const loading = ref(true)
 const currentLecture = ref<any>(null)
 
 // 轮询相关
-let pollInterval: NodeJS.Timeout | null = null
+let pollInterval: number | null = null
 const POLL_INTERVAL = 3000 // 3秒轮询一次
 
 // 计算属性

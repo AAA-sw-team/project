@@ -135,12 +135,20 @@ const getUserQuizStats = async (lectureId, userId) => {
     `SELECT * FROM user_quiz_stats WHERE lecture_id = ? AND user_id = ?`,
     [lectureId, userId]
   );
-  return rows[0] || {
+  if (rows[0]) return rows[0];
+  // 兜底：查找 quiz_answers 计算
+  const [answers] = await pool.promise().query(
+    `SELECT is_correct FROM quiz_answers WHERE lecture_id = ? AND user_id = ?`,
+    [lectureId, userId]
+  );
+  const total = answers.length;
+  const correct = answers.filter(a => a.is_correct).length;
+  return {
     user_id: userId,
     lecture_id: lectureId,
-    total_questions: 0,
-    correct_answers: 0,
-    accuracy_rate: 0,
+    total_questions: total,
+    correct_answers: correct,
+    accuracy_rate: total > 0 ? Math.round((correct / total) * 1000) / 10 : 0, // 百分比，保留1位小数
     groups_participated: 0,
     avg_answer_time_ms: null
   };
@@ -225,9 +233,13 @@ const getAnswerLeaderboard = async (lectureId, limit = 10) => {
   
   const [rows] = await pool.promise().query(
     `SELECT 
+      uqs.user_id,
       u.username,
       u.nickname,
-      uqs.*
+      uqs.accuracy_rate,
+      uqs.total_questions,
+      uqs.correct_answers,
+      uqs.avg_answer_time_ms
     FROM user_quiz_stats uqs
     JOIN users u ON uqs.user_id = u.id
     WHERE uqs.lecture_id = ?
@@ -247,5 +259,6 @@ module.exports = {
   getLectureQuizStats,
   getGroupQuizStats,
   checkUserAnswered,
-  getAnswerLeaderboard
+  getAnswerLeaderboard,
+  pool // 导出 pool 供 controller 用
 };
