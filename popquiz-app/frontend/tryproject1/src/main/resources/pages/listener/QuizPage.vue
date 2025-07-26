@@ -20,14 +20,6 @@
           <span class="stats-value">{{ completedQuestions }}</span>
         </div>
       </div>
-      
-      <!-- 调试信息 -->
-      <div v-if="userAnswers.size > 0" class="debug-info" style="margin-top: 1rem; padding: 0.5rem; background: rgba(0,0,0,0.1); border-radius: 8px; font-size: 0.8rem;">
-        <div><strong>调试信息:</strong></div>
-        <div>已答题目ID: {{ Array.from(userAnswers.keys()).join(', ') }}</div>
-        <div>当前题目ID: {{ currentQuestion?.id }}</div>
-        <div>当前题目是否已完成: {{ currentQuestion ? isQuestionCompleted(currentQuestion.id) : 'N/A' }}</div>
-      </div>
     </div>
 
     <!-- 讲座已结束提示 -->

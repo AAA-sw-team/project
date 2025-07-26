@@ -578,7 +578,7 @@ const getPerformanceClass = () => {
   const acc = overallAccuracy.value
   if (acc >= 90) return 'excellent'
   if (acc >= 80) return 'good'
-  if (acc >= 70) return 'fair'
+  if (acc >= 60) return 'fair'
   return 'poor'
 }
 
@@ -587,7 +587,7 @@ const getPerformanceLevel = () => {
   const acc = overallAccuracy.value
   if (acc >= 90) return 'A'
   if (acc >= 80) return 'B'
-  if (acc >= 70) return 'C'
+  if (acc >= 60) return 'C'
   return 'D'
 }
 
